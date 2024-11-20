@@ -1,32 +1,5 @@
-[
-    {
-        "batch_size": 15,
-        "epochs": 151,
-        "num_units": 101
-    },
-    {
-        "num_units": 150,
-        "batch_size": 40,
-        "epochs": 10
-    },
-    {
-        "num_units": 175,
-        "batch_size": 40,
-        "epochs": 4
-    },
-    {
-        "num_units": 200,
-        "batch_size": 54,
-        "epochs": 10
-    },
-    {
-        "num_units": 250,
-        "batch_size": 48,
-        "epochs": 10
-    },
-    {
-        "num_units": 271,
-        "batch_size": 52,
-        "epochs": 10
-    }
-]
+{
+    "batch_size": 28,
+    "epochs": 152,
+    "num_units": 235
+}

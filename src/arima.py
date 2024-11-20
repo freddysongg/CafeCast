@@ -158,21 +158,21 @@ def main():
     logger.info(f"Starting with initial best parameters: {best_params}")
 
     # Test ARIMA parameters for p
-    p_range = range(max(0, best_params['p'] - 2), best_params['p'] + 3)
+    p_range = range(max(0, best_params['p'] - 2), best_params['p'] + 30)
     metrics_history = test_arima_parameters(train, test, best_params, 'p', p_range)
     plot_metrics(metrics_history, 'p')
     best_entry = min(metrics_history, key=lambda x: x['rmse'])
     best_params['p'] = best_entry['p']
 
     # Test ARIMA parameters for d
-    d_range = range(max(0, best_params['d'] - 1), best_params['d'] + 2)
+    d_range = range(max(0, best_params['d'] - 1), best_params['d'] + 20)
     metrics_history = test_arima_parameters(train, test, best_params, 'd', d_range)
     plot_metrics(metrics_history, 'd')
     best_entry = min(metrics_history, key=lambda x: x['rmse'])
     best_params['d'] = best_entry['d']
 
     # Test ARIMA parameters for q
-    q_range = range(max(0, best_params['q'] - 2), best_params['q'] + 3)
+    q_range = range(max(0, best_params['q'] - 2), best_params['q'] + 30)
     metrics_history = test_arima_parameters(train, test, best_params, 'q', q_range)
     plot_metrics(metrics_history, 'q')
     best_entry = min(metrics_history, key=lambda x: x['rmse'])
