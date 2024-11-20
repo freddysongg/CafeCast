@@ -182,7 +182,7 @@ def main():
         scaler=scaler
     )
 
-    model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
+    model_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model.keras')
     final_model.save(model_path)
     logger.info(f"Final best model saved to {model_path}")
 
