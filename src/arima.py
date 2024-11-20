@@ -72,6 +72,12 @@ def load_best_params():
             return params_list[-1] if params_list else None
     return None
 
+def clear_params():
+    params_path = os.path.join(PARAMS_DIR, 'best_arima_params.json')
+    if os.path.exists(params_path):
+        os.remove(params_path)
+        logger.info(f"Deleted parameter file: {params_path}")
+
 # Function to evaluate the ARIMA model
 def evaluate_arima_model(train, test, p, d, q):
     try:
@@ -132,6 +138,11 @@ def plot_metrics(metrics_history, param_name):
 def main():
     cleanup_old_logs(LOG_DIR)
     logger.info("Starting ARIMA model script")
+    
+    # Optionally clear parameters and remove old models
+    # if 'clear_params' in sys.argv:
+    #     clear_params()
+    #     return
 
     # Load and prepare data
     logger.info("Loading and preparing data")

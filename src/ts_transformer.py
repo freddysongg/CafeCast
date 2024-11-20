@@ -181,9 +181,9 @@ def main():
     cleanup_old_logs(LOG_DIR)
 
     # Option to clear saved parameters
-    if len(sys.argv) > 1 and sys.argv[1] == 'clear_params':
-        clear_params()
-        return
+    # if len(sys.argv) > 1 and sys.argv[1] == 'clear_params':
+    #     clear_params()
+    #     return
 
     logger.info("Starting Transformer model script")
 

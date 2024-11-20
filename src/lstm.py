@@ -13,9 +13,9 @@ from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import Sequential, save_model
-from tensorflow.keras.layers import LSTM, Dense, Input
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential, save_model # type: ignore
+from tensorflow.keras.layers import LSTM, Dense, Input # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
 from data.modify_dataset import prepare_data
 
 # Ensure the logs, models, and params directories exist
@@ -245,9 +245,9 @@ def main():
     cleanup_old_logs(LOG_DIR)
 
     # Option to clear saved parameters
-    if len(sys.argv) > 1 and sys.argv[1] == 'clear_params':
-        clear_params()
-        return
+    # if len(sys.argv) > 1 and sys.argv[1] == 'clear_params':
+    #     clear_params()
+    #     return
 
     logger.info("Starting LSTM model script")
 

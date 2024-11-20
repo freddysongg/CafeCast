@@ -14,9 +14,9 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
 from bayes_opt import BayesianOptimization
-from tensorflow.keras.models import Sequential, save_model
-from tensorflow.keras.layers import LSTM, Dense, Input
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential, save_model # type: ignore
+from tensorflow.keras.layers import LSTM, Dense, Input # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
 from data.modify_dataset import prepare_data
 
 # Ensure the logs, models, and params directories exist
