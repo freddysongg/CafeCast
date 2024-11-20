@@ -82,8 +82,6 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_
     final_training_loss = history.history['loss'][-1]  # Get the last value of training loss
     final_val_loss = history.history['val_loss'][-1]   # Get the last value of validation loss
 
-    logger.info(f"Final Training Loss: {final_training_loss:.4f}, Final Validation Loss: {final_val_loss:.4f}")
-
     # Evaluate the model
     predictions = make_prediction(model, tf.convert_to_tensor(X_test, dtype=tf.float32)).numpy()
     predictions = scaler.inverse_transform(predictions)
@@ -93,7 +91,7 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_
     rmse = np.sqrt(mean_squared_error(y_test_actual, predictions))
 
     # Ensure the return matches the number of values expected to be unpacked
-    return model, mae, rmse, final_val_loss  # Adjusted to return 4 values
+    return model, mae, rmse, final_training_loss, final_val_loss 
 
 def plot_metrics(metrics_history, param_name):
     param_values = [entry[param_name] for entry in metrics_history]
@@ -299,7 +297,7 @@ def main():
     remove_existing_model(MODEL_DIR)
 
     # Save the final best model
-    final_model, mae, rmse, val_loss = train_and_evaluate_model(
+    final_model, mae, rmse, training_loss, val_loss = train_and_evaluate_model(
         X_train, X_test, y_train, y_test, 
         best_params['num_units'], best_params['batch_size'], 
         best_params['epochs'], 0.001, SEQ_LENGTH, scaler

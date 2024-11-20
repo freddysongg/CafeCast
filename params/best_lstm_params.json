@@ -18,5 +18,10 @@
         "num_units": 262,
         "batch_size": 9,
         "epochs": 225
+    },
+    {
+        "num_units": 287,
+        "batch_size": 17,
+        "epochs": 200
     }
 ]

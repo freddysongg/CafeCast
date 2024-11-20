@@ -2,8 +2,6 @@ venv/
 __pycache__/
 .ipynb_checkpoints/
 
-data/cafecast_data.xlsx
-
 models/
 
 logs/
