@@ -1,52 +1,36 @@
-import warnings
-warnings.filterwarnings("ignore", "urllib3 v2 only supports OpenSSL")
+import sys
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from data.modify_dataset import prepare_data
+def run_arima():
+    import arima
+    arima.main()
 
-data = prepare_data('data/cafecast_data.xlsx')
-daily_data = data.resample('D')['transaction_qty'].sum()  
+def run_lstm():
+    import lstm
+    lstm.main()
 
-# 80/20 split
-train_size = int(len(daily_data) * 0.8)
-train, test = daily_data[:train_size], daily_data[train_size:]
+def run_transformer():
+    import ts_transformer
+    ts_transformer.main()
 
-plt.figure(figsize=(14, 7))
-plt.plot(train, label='Training Data')
-plt.plot(test, label='Testing Data', color='orange')
+if __name__ == "__main__":
+    print("Choose a model to run:")
+    print("1. ARIMA")
+    print("2. LSTM RNN")
+    print("3. Time Series Transformer")
+    print("4. Custom Pipeline (all models)")
 
-plt.title('Train/Test Split for Time Series')
-plt.xlabel('Date')
-plt.ylabel('Transaction Quantity')
-plt.legend()
-plt.grid(True)
-plt.show()
+    choice = input("Enter the number of your choice: ")
 
-best_p, best_d, best_q = 1, 1, 2
-model = ARIMA(train, order=(best_p, best_d, best_q))
-model_fit = model.fit()
-
-print(model_fit.summary())
-
-forecast = model_fit.forecast(steps=len(test))
-
-# Plot actual vs forecast
-plt.figure(figsize=(14, 7))
-plt.plot(test.index, test, label='Actual', color='blue')
-plt.plot(test.index, forecast, label='Forecast', color='red')
-plt.title('Actual vs Forecasted Transaction Quantities')
-plt.xlabel('Date')
-plt.ylabel('Transaction Quantity')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-# Evaluate model performance
-mae = mean_absolute_error(test, forecast)
-rmse = np.sqrt(mean_squared_error(test, forecast))
-print(f'Mean Absolute Error (MAE): {mae:.2f}')
-print(f'Root Mean Squared Error (RMSE): {rmse:.2f}')
+    if choice == '1':
+        run_arima()
+    elif choice == '2':
+        run_lstm()
+    elif choice == '3':
+        run_transformer()
+    elif choice == '4':
+        print("Running a custom pipeline combining ARIMA, LSTM, and Transformer...")
+        run_arima()
+        run_lstm()
+        run_transformer()
+    else:
+        print("Invalid choice. Please select 1, 2, 3, or 4.")
