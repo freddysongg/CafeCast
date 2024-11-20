@@ -92,7 +92,8 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_
     mae = mean_absolute_error(y_test_actual, predictions)
     rmse = np.sqrt(mean_squared_error(y_test_actual, predictions))
 
-    return model, mae, rmse, final_training_loss, final_val_loss
+    # Ensure the return matches the number of values expected to be unpacked
+    return model, mae, rmse, final_val_loss  # Adjusted to return 4 values
 
 def plot_metrics(metrics_history, param_name):
     param_values = [entry[param_name] for entry in metrics_history]
@@ -298,7 +299,11 @@ def main():
     remove_existing_model(MODEL_DIR)
 
     # Save the final best model
-    final_model, _, _, _ = train_and_evaluate_model(X_train, X_test, y_train, y_test, best_params['num_units'], best_params['batch_size'], best_params['epochs'], 0.001, SEQ_LENGTH, scaler)
+    final_model, mae, rmse, val_loss = train_and_evaluate_model(
+        X_train, X_test, y_train, y_test, 
+        best_params['num_units'], best_params['batch_size'], 
+        best_params['epochs'], 0.001, SEQ_LENGTH, scaler
+    )
     model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
     final_model.save(model_path)
     logger.info(f"Best model saved to {model_path}")
