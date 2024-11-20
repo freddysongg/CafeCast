@@ -1,0 +1,22 @@
+[
+    {
+        "num_units": 237,
+        "batch_size": 16,
+        "epochs": 200
+    },
+    {
+        "num_units": 262,
+        "batch_size": 1,
+        "epochs": 150
+    },
+    {
+        "num_units": 237,
+        "batch_size": 9,
+        "epochs": 175
+    },
+    {
+        "num_units": 262,
+        "batch_size": 9,
+        "epochs": 225
+    }
+]

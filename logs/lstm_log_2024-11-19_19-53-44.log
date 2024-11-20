@@ -1,0 +1,67 @@
+2024-11-19 19:53:44,326 - INFO - Deleted old log file: logs/lstm_log_2024-11-19_19-05-42.log
+2024-11-19 19:53:44,326 - INFO - Starting LSTM model script
+2024-11-19 19:53:44,326 - INFO - Loading and preparing data
+2024-11-19 19:53:52,593 - INFO - Data overview: count     181.000000
+mean     1184.917127
+std       358.869597
+min       645.000000
+25%       878.000000
+50%      1099.000000
+75%      1512.000000
+max      1962.000000
+Name: transaction_qty, dtype: float64
+2024-11-19 19:53:52,594 - INFO - Training data size: 136, Testing data size: 35
+2024-11-19 19:53:52,595 - INFO - Starting with initial best parameters: {'num_units': 237, 'batch_size': 9, 'epochs': 175}
+2024-11-19 19:53:52,595 - INFO - Testing num_units=262
+2024-11-19 19:54:16,367 - INFO - Final Training Loss: 0.0050, Final Validation Loss: 0.0046
+2024-11-19 19:54:16,484 - INFO - num_units=262 - MAE: 103.18, RMSE: 137.75, Training Loss: 0.0050, Final Val Loss: 0.0046
+2024-11-19 19:54:16,484 - INFO - Testing num_units=237
+2024-11-19 19:54:36,884 - INFO - Final Training Loss: 0.0050, Final Validation Loss: 0.0060
+2024-11-19 19:54:37,034 - INFO - num_units=237 - MAE: 110.46, RMSE: 150.28, Training Loss: 0.0050, Final Val Loss: 0.0060
+2024-11-19 19:54:37,034 - INFO - Testing num_units=212
+2024-11-19 19:54:55,938 - INFO - Final Training Loss: 0.0044, Final Validation Loss: 0.0062
+2024-11-19 19:54:56,009 - INFO - num_units=212 - MAE: 112.93, RMSE: 139.79, Training Loss: 0.0044, Final Val Loss: 0.0062
+2024-11-19 19:54:56,009 - INFO - Testing num_units=187
+2024-11-19 19:55:14,544 - INFO - Final Training Loss: 0.0042, Final Validation Loss: 0.0050
+2024-11-19 19:55:14,621 - INFO - num_units=187 - MAE: 110.14, RMSE: 150.79, Training Loss: 0.0042, Final Val Loss: 0.0050
+2024-11-19 19:55:14,622 - INFO - Testing num_units=287
+2024-11-19 19:55:45,393 - INFO - Final Training Loss: 0.0039, Final Validation Loss: 0.0129
+2024-11-19 19:55:45,460 - WARNING - 5 out of the last 5 calls to <function make_prediction at 0x176869c10> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2024-11-19 19:55:45,462 - INFO - num_units=287 - MAE: 137.54, RMSE: 159.23, Training Loss: 0.0039, Final Val Loss: 0.0129
+2024-11-19 19:55:51,856 - INFO - Best num_units found: 262 with RMSE: 137.75
+2024-11-19 19:55:51,857 - INFO - Testing batch_size=1
+2024-11-19 19:57:41,520 - INFO - Final Training Loss: 0.0036, Final Validation Loss: 0.0087
+2024-11-19 19:57:41,596 - WARNING - 6 out of the last 6 calls to <function make_prediction at 0x176869c10> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2024-11-19 19:57:41,597 - INFO - batch_size=1 - MAE: 125.02, RMSE: 149.15, Training Loss: 0.0036, Final Val Loss: 0.0087
+2024-11-19 19:57:41,597 - INFO - Testing batch_size=9
+2024-11-19 19:58:09,924 - INFO - Final Training Loss: 0.0040, Final Validation Loss: 0.0046
+2024-11-19 19:58:10,027 - INFO - batch_size=9 - MAE: 109.16, RMSE: 147.36, Training Loss: 0.0040, Final Val Loss: 0.0046
+2024-11-19 19:58:10,027 - INFO - Testing batch_size=14
+2024-11-19 19:58:30,162 - INFO - Final Training Loss: 0.0047, Final Validation Loss: 0.0063
+2024-11-19 19:58:30,237 - INFO - batch_size=14 - MAE: 109.21, RMSE: 149.58, Training Loss: 0.0047, Final Val Loss: 0.0063
+2024-11-19 19:58:30,237 - INFO - Testing batch_size=17
+2024-11-19 19:58:48,197 - INFO - Final Training Loss: 0.0046, Final Validation Loss: 0.0064
+2024-11-19 19:58:48,270 - INFO - batch_size=17 - MAE: 124.84, RMSE: 165.52, Training Loss: 0.0046, Final Val Loss: 0.0064
+2024-11-19 19:58:48,270 - INFO - Testing batch_size=25
+2024-11-19 19:59:01,657 - INFO - Final Training Loss: 0.0046, Final Validation Loss: 0.0054
+2024-11-19 19:59:01,720 - INFO - batch_size=25 - MAE: 110.72, RMSE: 148.76, Training Loss: 0.0046, Final Val Loss: 0.0054
+2024-11-19 19:59:05,776 - INFO - Best batch_size found: 9 with RMSE: 147.36
+2024-11-19 19:59:05,778 - INFO - Testing epochs=225
+2024-11-19 19:59:39,075 - INFO - Final Training Loss: 0.0037, Final Validation Loss: 0.0062
+2024-11-19 19:59:39,144 - INFO - epochs=225 - MAE: 112.40, RMSE: 135.49, Training Loss: 0.0037, Final Val Loss: 0.0062
+2024-11-19 19:59:39,144 - INFO - Testing epochs=200
+2024-11-19 20:00:07,377 - INFO - Final Training Loss: 0.0042, Final Validation Loss: 0.0078
+2024-11-19 20:00:07,445 - INFO - epochs=200 - MAE: 115.76, RMSE: 138.27, Training Loss: 0.0042, Final Val Loss: 0.0078
+2024-11-19 20:00:07,445 - INFO - Testing epochs=175
+2024-11-19 20:00:32,172 - INFO - Final Training Loss: 0.0041, Final Validation Loss: 0.0049
+2024-11-19 20:00:32,238 - INFO - epochs=175 - MAE: 104.14, RMSE: 136.81, Training Loss: 0.0041, Final Val Loss: 0.0049
+2024-11-19 20:00:32,239 - INFO - Testing epochs=150
+2024-11-19 20:00:54,165 - INFO - Final Training Loss: 0.0046, Final Validation Loss: 0.0089
+2024-11-19 20:00:54,241 - INFO - epochs=150 - MAE: 121.08, RMSE: 143.88, Training Loss: 0.0046, Final Val Loss: 0.0089
+2024-11-19 20:00:54,242 - INFO - Testing epochs=125
+2024-11-19 20:01:11,955 - INFO - Final Training Loss: 0.0046, Final Validation Loss: 0.0070
+2024-11-19 20:01:12,016 - INFO - epochs=125 - MAE: 110.74, RMSE: 151.02, Training Loss: 0.0046, Final Val Loss: 0.0070
+2024-11-19 20:01:15,836 - INFO - Best epochs found: 225 with RMSE: 135.49
+2024-11-19 20:01:15,838 - INFO - Best parameters updated and saved to params/best_lstm_params.json
+2024-11-19 20:01:15,839 - INFO - Deleted old model file: models/best_lstm_model.keras
+2024-11-19 20:01:49,977 - INFO - Final Training Loss: 0.0038, Final Validation Loss: 0.0104
