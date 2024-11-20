@@ -104,6 +104,8 @@ cafecast/
 ├── venv/               # Virtual environment for dependency management
 ├── requirements.txt    # Project dependencies
 └── README.md           # Project documentation
+```
+
 ---
 
 ## License 📜
