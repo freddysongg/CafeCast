@@ -94,6 +94,7 @@ By combining these methodologies, CaféCast excels in flexibility and precision,
 ---
 
 ## Project Structure 📂
+```plaintext
 cafecast/
 ├── data/               # Sample datasets and preprocessing scripts
 ├── logs/               # Logging files for training and debugging
