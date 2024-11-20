@@ -7,16 +7,16 @@ import sys
 import json
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
+from bayes_opt import BayesianOptimization
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.layers import LSTM, Dense, Input
 from tensorflow.keras.optimizers import Adam
-from skopt import gp_minimize
-from skopt.space import Integer, Real
-from skopt.utils import use_named_args
 from data.modify_dataset import prepare_data
 
 # Ensure the logs, models, and params directories exist
@@ -30,19 +30,18 @@ os.makedirs(PARAMS_DIR, exist_ok=True)
 # Generate a timestamped log file name
 log_filename = os.path.join(LOG_DIR, f"lstm_bayesian_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
 
-# Configure logging
+# Configure logging with both console and file handlers
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
 if logger.hasHandlers():
     logger.handlers.clear()
 
-# Console handler for real-time output
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(console_handler)
 
-# File handler for logs
 file_handler = logging.FileHandler(log_filename, mode='w')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
@@ -55,6 +54,10 @@ def create_sequences(data, seq_length):
         y.append(data[i + seq_length])
     return np.array(X), np.array(y)
 
+@tf.function(reduce_retracing=True)
+def make_prediction(model, X_test):
+    return model(X_test, training=False)
+
 def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, SEQ_LENGTH, scaler):
     model = Sequential()
     model.add(Input(shape=(SEQ_LENGTH, 1)))
@@ -62,91 +65,126 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_
     model.add(Dense(1))
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mean_squared_error')
 
-    # Train the model
-    history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.1, verbose=0)
+    # Train the model and capture the training history
+    history = model.fit(X_train, y_train, epochs=int(epochs), batch_size=int(batch_size), validation_split=0.1, verbose=0)
+
+    # Log training and validation loss
+    final_training_loss = history.history['loss'][-1]
+    final_val_loss = history.history['val_loss'][-1]
+
+    logger.info(f"Final Training Loss: {final_training_loss:.4f}, Final Validation Loss: {final_val_loss:.4f}")
 
     # Evaluate the model
-    predictions = model.predict(X_test)
+    predictions = make_prediction(model, tf.convert_to_tensor(X_test, dtype=tf.float32))
     predictions = scaler.inverse_transform(predictions)
     y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
 
     mae = mean_absolute_error(y_test_actual, predictions)
     rmse = np.sqrt(mean_squared_error(y_test_actual, predictions))
 
-    logger.info(f"Model evaluation - num_units: {num_units}, batch_size: {batch_size}, epochs: {epochs}")
-    logger.info(f"MAE: {mae:.2f}, RMSE: {rmse:.2f}")
+    return model, mae, rmse, final_training_loss, final_val_loss
 
-    return rmse  # We return RMSE as it is the optimization target
+def cross_val_rmse(X, y, num_units, batch_size, epochs, learning_rate, SEQ_LENGTH, scaler, k=5):
+    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    rmse_scores = []
 
-# Load data
-logger.info("Loading and preparing data")
-data = prepare_data('data/cafecast_data.xlsx')
-daily_data = data.resample('D')['transaction_qty'].sum()
-logger.info(f"Data overview: {daily_data.describe()}")
+    for train_index, val_index in kf.split(X):
+        X_train, X_val = X[train_index], X[val_index]
+        y_train, y_val = y[train_index], y[val_index]
 
-# Scale data
-scaler = MinMaxScaler()
-scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
-SEQ_LENGTH = 10
-X, y = create_sequences(scaled_data, SEQ_LENGTH)
-train_size = int(len(X) * 0.8)
-X_train, X_test = X[:train_size], X[train_size:]
-y_train, y_test = y[:train_size], y[train_size:]
+        model = Sequential()
+        model.add(Input(shape=(SEQ_LENGTH, 1)))
+        model.add(LSTM(units=int(num_units), activation='relu'))
+        model.add(Dense(1))
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mean_squared_error')
 
-logger.info(f"Training data size: {len(X_train)}, Testing data size: {len(X_test)}")
+        model.fit(X_train, y_train, epochs=int(epochs), batch_size=int(batch_size), verbose=0)
 
-# Define the search space for Bayesian Optimization
-search_space = [
-    Integer(50, 300, name='num_units'),
-    Integer(16, 128, name='batch_size'),
-    Integer(50, 300, name='epochs')
-]
+        predictions = make_prediction(model, tf.convert_to_tensor(X_val, dtype=tf.float32)).numpy()
+        predictions = scaler.inverse_transform(predictions)
+        y_val_actual = scaler.inverse_transform(y_val.reshape(-1, 1))
 
-@use_named_args(search_space)
-def objective_function(num_units, batch_size, epochs):
-    # Run the model training and evaluation
-    rmse = train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_size, epochs, 0.001, SEQ_LENGTH, scaler)
-    return rmse
+        rmse = np.sqrt(mean_squared_error(y_val_actual, predictions))
+        rmse_scores.append(rmse)
 
-# Run Bayesian Optimization
-logger.info("Starting Bayesian Optimization")
-result = gp_minimize(
-    func=objective_function,
-    dimensions=search_space,
-    n_calls=20,  # Number of total iterations
-    random_state=42
-)
+    return np.mean(rmse_scores)
 
-# Log best result
-best_num_units = result.x[0]
-best_batch_size = result.x[1]
-best_epochs = result.x[2]
-logger.info(f"Best Parameters found - num_units: {best_num_units}, batch_size: {best_batch_size}, epochs: {best_epochs}")
-logger.info(f"Best RMSE: {result.fun:.2f}")
+def bayesian_optimize(X, y, SEQ_LENGTH, scaler):
+    def lstm_model_optimizer(num_units, batch_size, epochs):
+        rmse = cross_val_rmse(
+            X, y, 
+            num_units=int(num_units), 
+            batch_size=int(batch_size), 
+            epochs=int(epochs), 
+            learning_rate=0.001, 
+            SEQ_LENGTH=SEQ_LENGTH, 
+            scaler=scaler
+        )
+        return -rmse  # Negative because Bayesian optimization maximizes the function
 
-# Save the best parameters
-best_params = {
-    'num_units': best_num_units,
-    'batch_size': best_batch_size,
-    'epochs': best_epochs
-}
-params_path = os.path.join(PARAMS_DIR, 'best_lstm_bayesian_params.json')
-with open(params_path, 'w') as f:
-    json.dump(best_params, f, indent=4)
-logger.info(f"Best parameters saved to {params_path}")
+    pbounds = {
+        'num_units': (50, 300),
+        'batch_size': (8, 128),
+        'epochs': (50, 300)
+    }
 
-# Remove existing model before saving the new best model
-def remove_existing_model(model_dir):
-    for file in os.listdir(model_dir):
-        file_path = os.path.join(model_dir, file)
-        if os.path.isfile(file_path) and file_path.endswith('.keras'):
-            os.remove(file_path)
-            logger.info(f"Deleted old model file: {file_path}")
+    optimizer = BayesianOptimization(
+        f=lstm_model_optimizer,
+        pbounds=pbounds,
+        random_state=42,
+        verbose=2
+    )
 
-# Save the final best model
-logger.info("Saving the final model with best parameters")
-remove_existing_model(MODEL_DIR)
-final_model, _, _, _ = train_and_evaluate_model(X_train, X_test, y_train, y_test, best_num_units, best_batch_size, best_epochs, 0.001, SEQ_LENGTH, scaler)
-model_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model.keras')
-final_model.save(model_path)
-logger.info(f"Best model saved to {model_path}")
+    optimizer.maximize(init_points=10, n_iter=50)
+
+    best_params = optimizer.max['params']
+    logger.info(f"Best Parameters found - num_units: {int(best_params['num_units'])}, "
+                f"batch_size: {int(best_params['batch_size'])}, epochs: {int(best_params['epochs'])}")
+    logger.info(f"Best RMSE: {-optimizer.max['target']:.2f}")
+
+    # Save best parameters
+    params_path = os.path.join(PARAMS_DIR, 'best_lstm_params.json')
+    best_params_converted = {key: int(value) for key, value in best_params.items()}
+    with open(params_path, 'w') as f:
+        json.dump(best_params_converted, f, indent=4)
+
+    return best_params_converted
+
+def main():
+    logger.info("Loading and preparing data")
+    data = prepare_data('data/cafecast_data.xlsx')
+    daily_data = data.resample('D')['transaction_qty'].sum()
+    logger.info(f"Data overview: {daily_data.describe()}")
+
+    scaler = MinMaxScaler()
+    scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
+
+    SEQ_LENGTH = 10
+    X, y = create_sequences(scaled_data, SEQ_LENGTH)
+    train_size = int(len(X) * 0.8)
+    X_train, X_test = X[:train_size], X[train_size:]
+    y_train, y_test = y[:train_size], y[train_size:]
+
+    logger.info(f"Training data size: {len(X_train)}, Testing data size: {len(X_test)}")
+    logger.info("Starting Bayesian Optimization")
+
+    best_params = bayesian_optimize(X_train, y_train, SEQ_LENGTH, scaler)
+
+    # Train final model with best parameters found
+    logger.info(f"Training final model with best parameters: {best_params}")
+    final_model, mae, rmse, training_loss, val_loss = train_and_evaluate_model(
+        X_train, X_test, y_train, y_test,
+        num_units=best_params['num_units'],
+        batch_size=best_params['batch_size'],
+        epochs=best_params['epochs'],
+        learning_rate=0.001,
+        SEQ_LENGTH=SEQ_LENGTH,
+        scaler=scaler
+    )
+
+    model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
+    final_model.save(model_path)
+    logger.info(f"Final best model saved to {model_path}")
+
+if __name__ == "__main__":
+    main()

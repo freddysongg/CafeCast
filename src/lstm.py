@@ -83,7 +83,7 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_
     final_val_loss = history.history['val_loss'][-1]   # Get the last value of validation loss
 
     # Evaluate the model
-    predictions = make_prediction(model, tf.convert_to_tensor(X_test, dtype=tf.float32)).numpy()
+    predictions = make_prediction(model, tf.convert_to_tensor(X_test, dtype=tf.float32))
     predictions = scaler.inverse_transform(predictions)
     y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
 
@@ -162,7 +162,7 @@ def remove_existing_model(model_dir):
             os.remove(file_path)
             logger.info(f"Deleted old model file: {file_path}")
             
-def test_parameters(param_name, param_list, best_params, X_train, X_test, y_train, y_test, SEQ_LENGTH, scaler, test_count=5):
+def test_parameters(param_name, param_list, best_params, X_train, X_test, y_train, y_test, SEQ_LENGTH, scaler, test_count=20):
     metrics_history = []
     tested_count = 0
     unique_param_values = set(param_list)
@@ -222,6 +222,25 @@ def test_parameters(param_name, param_list, best_params, X_train, X_test, y_trai
 
     return metrics_history
 
+def summarize_best_results(best_metrics_history):
+    if not best_metrics_history:
+        logger.warning("No best metrics found to summarize.")
+        return None
+
+    avg_mae = np.mean([entry['mae'] for entry in best_metrics_history])
+    avg_rmse = np.mean([entry['rmse'] for entry in best_metrics_history])
+    avg_training_loss = np.mean([entry['training_loss'] for entry in best_metrics_history])
+    avg_val_loss = np.mean([entry['val_loss'] for entry in best_metrics_history])
+    
+    logger.info(f"Summary of best parameters:")
+    logger.info(f"Average MAE: {avg_mae:.2f}")
+    logger.info(f"Average RMSE: {avg_rmse:.2f}")
+    logger.info(f"Average Training Loss: {avg_training_loss:.4f}")
+    logger.info(f"Average Final Validation Loss: {avg_val_loss:.4f}")
+
+    return avg_mae, avg_rmse, avg_training_loss, avg_val_loss
+
+
 def main():
     cleanup_old_logs(LOG_DIR)
 
@@ -253,6 +272,8 @@ def main():
     # Load existing best parameters if available
     best_params = load_best_params() or {'num_units': 100, 'batch_size': 32, 'epochs': 50}
     logger.info(f"Starting with initial best parameters: {best_params}")
+    
+    best_metrics_history = []
 
     # Step 1: Find the best num_units by adjusting values around the current best
     num_units_list = [best_params['num_units']] + [
@@ -292,14 +313,19 @@ def main():
 
     # Save the updated best parameters
     save_best_params(best_params)
-
-    # Remove existing model before saving the new best model
-    remove_existing_model(MODEL_DIR)
+    
+    summary = summarize_best_results(best_metrics_history)
+    if summary:
+        avg_mae, avg_rmse, avg_training_loss, avg_val_loss = summary
+    else:
+        logger.error("Failed to generate a summary of the best results.")
+        # Remove existing model before saving the new best model
+        remove_existing_model(MODEL_DIR)
 
     # Save the final best model
     final_model, mae, rmse, training_loss, val_loss = train_and_evaluate_model(
-        X_train, X_test, y_train, y_test, 
-        best_params['num_units'], best_params['batch_size'], 
+        X_train, X_test, y_train, y_test,
+        best_params['num_units'], best_params['batch_size'],
         best_params['epochs'], 0.001, SEQ_LENGTH, scaler
     )
     model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
