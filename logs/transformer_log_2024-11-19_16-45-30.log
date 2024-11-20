@@ -1,0 +1,48 @@
+2024-11-19 16:45:30,933 - INFO - Deleted old log file: logs/transformer_log_2024-11-19_16-36-23.log
+2024-11-19 16:45:30,933 - INFO - Loading and preparing data
+2024-11-19 16:45:38,021 - INFO - Iteration 1 starting with parameters: {'num_layers': 2, 'num_heads': 2, 'd_model': 32, 'dim_feedforward': 64, 'learning_rate': 0.001}
+2024-11-19 16:45:38,603 - INFO - Iteration 1, Epoch 10/50, Loss: 0.0988
+2024-11-19 16:45:38,727 - INFO - Iteration 1, Epoch 20/50, Loss: 0.0842
+2024-11-19 16:45:38,846 - INFO - Iteration 1, Epoch 30/50, Loss: 0.0516
+2024-11-19 16:45:38,949 - INFO - Iteration 1, Epoch 40/50, Loss: 0.0445
+2024-11-19 16:45:39,055 - INFO - Iteration 1, Epoch 50/50, Loss: 0.0359
+2024-11-19 16:45:39,058 - INFO - Iteration 1 - Evaluation results - MAE: 486.05, RMSE: 510.58
+2024-11-19 16:45:39,058 - INFO - New best model found: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005} with RMSE: 510.58
+2024-11-19 16:45:39,058 - INFO - Iteration 2 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:45:39,337 - INFO - Iteration 2, Epoch 10/50, Loss: 0.1093
+2024-11-19 16:45:39,633 - INFO - Iteration 2, Epoch 20/50, Loss: 0.0650
+2024-11-19 16:45:39,946 - INFO - Iteration 2, Epoch 30/50, Loss: 0.0586
+2024-11-19 16:45:40,225 - INFO - Iteration 2, Epoch 40/50, Loss: 0.0626
+2024-11-19 16:45:40,505 - INFO - Iteration 2, Epoch 50/50, Loss: 0.0585
+2024-11-19 16:45:40,508 - INFO - Iteration 2 - Evaluation results - MAE: 535.01, RMSE: 557.72
+2024-11-19 16:45:40,508 - INFO - Iteration 3 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:45:40,789 - INFO - Iteration 3, Epoch 10/50, Loss: 0.1506
+2024-11-19 16:45:41,065 - INFO - Iteration 3, Epoch 20/50, Loss: 0.0969
+2024-11-19 16:45:41,432 - INFO - Iteration 3, Epoch 30/50, Loss: 0.0715
+2024-11-19 16:45:41,714 - INFO - Iteration 3, Epoch 40/50, Loss: 0.0540
+2024-11-19 16:45:42,075 - INFO - Iteration 3, Epoch 50/50, Loss: 0.0510
+2024-11-19 16:45:42,079 - INFO - Iteration 3 - Evaluation results - MAE: 537.67, RMSE: 560.19
+2024-11-19 16:45:42,079 - INFO - Iteration 4 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:45:42,394 - INFO - Iteration 4, Epoch 10/50, Loss: 0.0774
+2024-11-19 16:45:42,674 - INFO - Iteration 4, Epoch 20/50, Loss: 0.0636
+2024-11-19 16:45:42,983 - INFO - Iteration 4, Epoch 30/50, Loss: 0.0601
+2024-11-19 16:45:43,298 - INFO - Iteration 4, Epoch 40/50, Loss: 0.0606
+2024-11-19 16:45:43,579 - INFO - Iteration 4, Epoch 50/50, Loss: 0.0521
+2024-11-19 16:45:43,582 - INFO - Iteration 4 - Evaluation results - MAE: 552.60, RMSE: 574.80
+2024-11-19 16:45:43,582 - INFO - Iteration 5 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:45:43,897 - INFO - Iteration 5, Epoch 10/50, Loss: 0.0970
+2024-11-19 16:45:44,187 - INFO - Iteration 5, Epoch 20/50, Loss: 0.0613
+2024-11-19 16:45:44,479 - INFO - Iteration 5, Epoch 30/50, Loss: 0.0576
+2024-11-19 16:45:44,759 - INFO - Iteration 5, Epoch 40/50, Loss: 0.0408
+2024-11-19 16:45:45,038 - INFO - Iteration 5, Epoch 50/50, Loss: 0.0365
+2024-11-19 16:45:45,041 - INFO - Iteration 5 - Evaluation results - MAE: 497.82, RMSE: 521.92
+2024-11-19 16:45:45,041 - INFO - Iteration 6 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:45:45,321 - INFO - Iteration 6, Epoch 10/50, Loss: 0.1077
+2024-11-19 16:45:45,602 - INFO - Iteration 6, Epoch 20/50, Loss: 0.0704
+2024-11-19 16:45:45,917 - INFO - Iteration 6, Epoch 30/50, Loss: 0.0543
+2024-11-19 16:45:46,202 - INFO - Iteration 6, Epoch 40/50, Loss: 0.0498
+2024-11-19 16:45:46,478 - INFO - Iteration 6, Epoch 50/50, Loss: 0.0390
+2024-11-19 16:45:46,481 - INFO - Iteration 6 - Evaluation results - MAE: 425.02, RMSE: 453.16
+2024-11-19 16:45:46,481 - INFO - New best model found: {'num_layers': 4, 'num_heads': 6, 'd_model': 128, 'dim_feedforward': 256, 'learning_rate': 0.00025} with RMSE: 453.16
+2024-11-19 16:45:46,481 - INFO - Iteration 7 starting with parameters: {'num_layers': 4, 'num_heads': 6, 'd_model': 128, 'dim_feedforward': 256, 'learning_rate': 0.00025}
+2024-11-19 16:45:46,481 - INFO - Adjusted num_heads to 6 to ensure d_model (128) is divisible by num_heads

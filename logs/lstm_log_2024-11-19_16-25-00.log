@@ -1,0 +1,80 @@
+2024-11-19 16:25:00,434 - INFO - Starting LSTM model script
+2024-11-19 16:25:00,434 - INFO - Loading and preparing data
+2024-11-19 16:25:07,438 - INFO - Data overview: count     181.000000
+mean     1184.917127
+std       358.869597
+min       645.000000
+25%       878.000000
+50%      1099.000000
+75%      1512.000000
+max      1962.000000
+Name: transaction_qty, dtype: float64
+2024-11-19 16:25:07,439 - INFO - Sequence length set to: 10
+2024-11-19 16:25:07,439 - INFO - Training data size: 136, Testing data size: 35
+2024-11-19 16:25:07,477 - INFO - Model configuration:
+2024-11-19 16:25:07,478 - INFO - Model: "sequential"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Layer (type)                         ┃ Output Shape                ┃         Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ lstm (LSTM)                          │ (None, 50)                  │          10,400 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ dense (Dense)                        │ (None, 1)                   │              51 │
+└──────────────────────────────────────┴─────────────────────────────┴─────────────────┘
+ Total params: 10,451 (40.82 KB)
+ Trainable params: 10,451 (40.82 KB)
+ Non-trainable params: 0 (0.00 B)
+
+2024-11-19 16:25:07,478 - INFO - Starting model training
+2024-11-19 16:25:09,639 - INFO - Training completed. Logging training history:
+2024-11-19 16:25:09,639 - INFO - Epoch 1: loss = 0.1416, val_loss = 0.6295
+2024-11-19 16:25:09,639 - INFO - Epoch 2: loss = 0.1225, val_loss = 0.5560
+2024-11-19 16:25:09,639 - INFO - Epoch 3: loss = 0.1041, val_loss = 0.4865
+2024-11-19 16:25:09,639 - INFO - Epoch 4: loss = 0.0874, val_loss = 0.4173
+2024-11-19 16:25:09,639 - INFO - Epoch 5: loss = 0.0712, val_loss = 0.3453
+2024-11-19 16:25:09,639 - INFO - Epoch 6: loss = 0.0545, val_loss = 0.2652
+2024-11-19 16:25:09,639 - INFO - Epoch 7: loss = 0.0378, val_loss = 0.1759
+2024-11-19 16:25:09,639 - INFO - Epoch 8: loss = 0.0247, val_loss = 0.0873
+2024-11-19 16:25:09,639 - INFO - Epoch 9: loss = 0.0184, val_loss = 0.0324
+2024-11-19 16:25:09,639 - INFO - Epoch 10: loss = 0.0192, val_loss = 0.0169
+2024-11-19 16:25:09,639 - INFO - Epoch 11: loss = 0.0170, val_loss = 0.0207
+2024-11-19 16:25:09,639 - INFO - Epoch 12: loss = 0.0133, val_loss = 0.0295
+2024-11-19 16:25:09,639 - INFO - Epoch 13: loss = 0.0120, val_loss = 0.0305
+2024-11-19 16:25:09,639 - INFO - Epoch 14: loss = 0.0113, val_loss = 0.0213
+2024-11-19 16:25:09,639 - INFO - Epoch 15: loss = 0.0100, val_loss = 0.0075
+2024-11-19 16:25:09,639 - INFO - Epoch 16: loss = 0.0087, val_loss = 0.0048
+2024-11-19 16:25:09,639 - INFO - Epoch 17: loss = 0.0081, val_loss = 0.0069
+2024-11-19 16:25:09,639 - INFO - Epoch 18: loss = 0.0074, val_loss = 0.0064
+2024-11-19 16:25:09,639 - INFO - Epoch 19: loss = 0.0069, val_loss = 0.0082
+2024-11-19 16:25:09,639 - INFO - Epoch 20: loss = 0.0067, val_loss = 0.0148
+2024-11-19 16:25:09,639 - INFO - Epoch 21: loss = 0.0065, val_loss = 0.0245
+2024-11-19 16:25:09,639 - INFO - Epoch 22: loss = 0.0065, val_loss = 0.0276
+2024-11-19 16:25:09,639 - INFO - Epoch 23: loss = 0.0067, val_loss = 0.0297
+2024-11-19 16:25:09,639 - INFO - Epoch 24: loss = 0.0066, val_loss = 0.0179
+2024-11-19 16:25:09,639 - INFO - Epoch 25: loss = 0.0067, val_loss = 0.0185
+2024-11-19 16:25:09,639 - INFO - Epoch 26: loss = 0.0065, val_loss = 0.0221
+2024-11-19 16:25:09,639 - INFO - Epoch 27: loss = 0.0065, val_loss = 0.0264
+2024-11-19 16:25:09,639 - INFO - Epoch 28: loss = 0.0067, val_loss = 0.0220
+2024-11-19 16:25:09,639 - INFO - Epoch 29: loss = 0.0065, val_loss = 0.0129
+2024-11-19 16:25:09,639 - INFO - Epoch 30: loss = 0.0066, val_loss = 0.0127
+2024-11-19 16:25:09,639 - INFO - Epoch 31: loss = 0.0065, val_loss = 0.0193
+2024-11-19 16:25:09,639 - INFO - Epoch 32: loss = 0.0065, val_loss = 0.0164
+2024-11-19 16:25:09,639 - INFO - Epoch 33: loss = 0.0065, val_loss = 0.0144
+2024-11-19 16:25:09,639 - INFO - Epoch 34: loss = 0.0065, val_loss = 0.0148
+2024-11-19 16:25:09,639 - INFO - Epoch 35: loss = 0.0064, val_loss = 0.0149
+2024-11-19 16:25:09,639 - INFO - Epoch 36: loss = 0.0064, val_loss = 0.0149
+2024-11-19 16:25:09,639 - INFO - Epoch 37: loss = 0.0065, val_loss = 0.0160
+2024-11-19 16:25:09,639 - INFO - Epoch 38: loss = 0.0066, val_loss = 0.0117
+2024-11-19 16:25:09,639 - INFO - Epoch 39: loss = 0.0065, val_loss = 0.0147
+2024-11-19 16:25:09,639 - INFO - Epoch 40: loss = 0.0064, val_loss = 0.0171
+2024-11-19 16:25:09,639 - INFO - Epoch 41: loss = 0.0064, val_loss = 0.0127
+2024-11-19 16:25:09,639 - INFO - Epoch 42: loss = 0.0064, val_loss = 0.0119
+2024-11-19 16:25:09,640 - INFO - Epoch 43: loss = 0.0067, val_loss = 0.0178
+2024-11-19 16:25:09,640 - INFO - Epoch 44: loss = 0.0064, val_loss = 0.0125
+2024-11-19 16:25:09,640 - INFO - Epoch 45: loss = 0.0064, val_loss = 0.0112
+2024-11-19 16:25:09,640 - INFO - Epoch 46: loss = 0.0065, val_loss = 0.0147
+2024-11-19 16:25:09,640 - INFO - Epoch 47: loss = 0.0064, val_loss = 0.0118
+2024-11-19 16:25:09,640 - INFO - Epoch 48: loss = 0.0064, val_loss = 0.0130
+2024-11-19 16:25:09,640 - INFO - Epoch 49: loss = 0.0064, val_loss = 0.0159
+2024-11-19 16:25:09,640 - INFO - Epoch 50: loss = 0.0066, val_loss = 0.0106
+2024-11-19 16:25:09,640 - INFO - Making predictions
+2024-11-19 16:25:17,363 - INFO - Model evaluation - MAE: 202.08, RMSE: 258.52

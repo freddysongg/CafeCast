@@ -1,0 +1,130 @@
+2024-11-19 16:43:01,998 - INFO - Loading and preparing data
+2024-11-19 16:43:09,419 - INFO - Iteration 1 starting with parameters: {'num_layers': 2, 'num_heads': 2, 'd_model': 32, 'dim_feedforward': 64, 'learning_rate': 0.001}
+2024-11-19 16:43:10,011 - INFO - Iteration 1, Epoch 10/50, Loss: 0.1068
+2024-11-19 16:43:10,256 - INFO - Iteration 1, Epoch 20/50, Loss: 0.0604
+2024-11-19 16:43:10,411 - INFO - Iteration 1, Epoch 30/50, Loss: 0.0547
+2024-11-19 16:43:10,523 - INFO - Iteration 1, Epoch 40/50, Loss: 0.0323
+2024-11-19 16:43:10,627 - INFO - Iteration 1, Epoch 50/50, Loss: 0.0314
+2024-11-19 16:43:10,630 - INFO - Iteration 1 - Evaluation results - MAE: 388.83, RMSE: 419.06
+2024-11-19 16:43:10,630 - INFO - New best model found: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005} with RMSE: 419.06
+2024-11-19 16:43:10,631 - INFO - Iteration 2 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:10,918 - INFO - Iteration 2, Epoch 10/50, Loss: 0.1015
+2024-11-19 16:43:11,234 - INFO - Iteration 2, Epoch 20/50, Loss: 0.0706
+2024-11-19 16:43:11,513 - INFO - Iteration 2, Epoch 30/50, Loss: 0.0470
+2024-11-19 16:43:11,792 - INFO - Iteration 2, Epoch 40/50, Loss: 0.0423
+2024-11-19 16:43:12,087 - INFO - Iteration 2, Epoch 50/50, Loss: 0.0350
+2024-11-19 16:43:12,090 - INFO - Iteration 2 - Evaluation results - MAE: 417.42, RMSE: 446.09
+2024-11-19 16:43:12,090 - INFO - Iteration 3 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:12,372 - INFO - Iteration 3, Epoch 10/50, Loss: 0.0624
+2024-11-19 16:43:12,657 - INFO - Iteration 3, Epoch 20/50, Loss: 0.0605
+2024-11-19 16:43:13,031 - INFO - Iteration 3, Epoch 30/50, Loss: 0.0519
+2024-11-19 16:43:13,442 - INFO - Iteration 3, Epoch 40/50, Loss: 0.0513
+2024-11-19 16:43:13,724 - INFO - Iteration 3, Epoch 50/50, Loss: 0.0399
+2024-11-19 16:43:13,728 - INFO - Iteration 3 - Evaluation results - MAE: 451.54, RMSE: 477.96
+2024-11-19 16:43:13,728 - INFO - Iteration 4 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:14,021 - INFO - Iteration 4, Epoch 10/50, Loss: 0.0798
+2024-11-19 16:43:14,344 - INFO - Iteration 4, Epoch 20/50, Loss: 0.0586
+2024-11-19 16:43:14,658 - INFO - Iteration 4, Epoch 30/50, Loss: 0.0481
+2024-11-19 16:43:14,960 - INFO - Iteration 4, Epoch 40/50, Loss: 0.0440
+2024-11-19 16:43:15,285 - INFO - Iteration 4, Epoch 50/50, Loss: 0.0345
+2024-11-19 16:43:15,288 - INFO - Iteration 4 - Evaluation results - MAE: 471.25, RMSE: 496.78
+2024-11-19 16:43:15,288 - INFO - Iteration 5 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:15,575 - INFO - Iteration 5, Epoch 10/50, Loss: 0.0901
+2024-11-19 16:43:15,865 - INFO - Iteration 5, Epoch 20/50, Loss: 0.0643
+2024-11-19 16:43:16,151 - INFO - Iteration 5, Epoch 30/50, Loss: 0.0596
+2024-11-19 16:43:16,460 - INFO - Iteration 5, Epoch 40/50, Loss: 0.0483
+2024-11-19 16:43:16,771 - INFO - Iteration 5, Epoch 50/50, Loss: 0.0473
+2024-11-19 16:43:16,777 - INFO - Iteration 5 - Evaluation results - MAE: 568.09, RMSE: 589.50
+2024-11-19 16:43:16,777 - INFO - Iteration 6 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:17,126 - INFO - Iteration 6, Epoch 10/50, Loss: 0.0993
+2024-11-19 16:43:17,502 - INFO - Iteration 6, Epoch 20/50, Loss: 0.0537
+2024-11-19 16:43:18,027 - INFO - Iteration 6, Epoch 30/50, Loss: 0.0528
+2024-11-19 16:43:18,312 - INFO - Iteration 6, Epoch 40/50, Loss: 0.0465
+2024-11-19 16:43:18,657 - INFO - Iteration 6, Epoch 50/50, Loss: 0.0387
+2024-11-19 16:43:18,661 - INFO - Iteration 6 - Evaluation results - MAE: 471.73, RMSE: 497.27
+2024-11-19 16:43:18,661 - INFO - Iteration 7 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:18,956 - INFO - Iteration 7, Epoch 10/50, Loss: 0.1397
+2024-11-19 16:43:19,310 - INFO - Iteration 7, Epoch 20/50, Loss: 0.0723
+2024-11-19 16:43:19,610 - INFO - Iteration 7, Epoch 30/50, Loss: 0.0539
+2024-11-19 16:43:19,897 - INFO - Iteration 7, Epoch 40/50, Loss: 0.0432
+2024-11-19 16:43:20,281 - INFO - Iteration 7, Epoch 50/50, Loss: 0.0484
+2024-11-19 16:43:20,285 - INFO - Iteration 7 - Evaluation results - MAE: 512.54, RMSE: 536.13
+2024-11-19 16:43:20,285 - INFO - Iteration 8 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:20,625 - INFO - Iteration 8, Epoch 10/50, Loss: 0.0831
+2024-11-19 16:43:21,031 - INFO - Iteration 8, Epoch 20/50, Loss: 0.0733
+2024-11-19 16:43:21,403 - INFO - Iteration 8, Epoch 30/50, Loss: 0.0566
+2024-11-19 16:43:21,750 - INFO - Iteration 8, Epoch 40/50, Loss: 0.0531
+2024-11-19 16:43:22,026 - INFO - Iteration 8, Epoch 50/50, Loss: 0.0380
+2024-11-19 16:43:22,029 - INFO - Iteration 8 - Evaluation results - MAE: 482.72, RMSE: 507.74
+2024-11-19 16:43:22,029 - INFO - Iteration 9 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:22,335 - INFO - Iteration 9, Epoch 10/50, Loss: 0.1633
+2024-11-19 16:43:22,650 - INFO - Iteration 9, Epoch 20/50, Loss: 0.0777
+2024-11-19 16:43:22,971 - INFO - Iteration 9, Epoch 30/50, Loss: 0.0599
+2024-11-19 16:43:23,249 - INFO - Iteration 9, Epoch 40/50, Loss: 0.0578
+2024-11-19 16:43:23,581 - INFO - Iteration 9, Epoch 50/50, Loss: 0.0469
+2024-11-19 16:43:23,584 - INFO - Iteration 9 - Evaluation results - MAE: 494.76, RMSE: 519.18
+2024-11-19 16:43:23,584 - INFO - Iteration 10 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:23,897 - INFO - Iteration 10, Epoch 10/50, Loss: 0.0990
+2024-11-19 16:43:24,204 - INFO - Iteration 10, Epoch 20/50, Loss: 0.0689
+2024-11-19 16:43:24,490 - INFO - Iteration 10, Epoch 30/50, Loss: 0.0538
+2024-11-19 16:43:24,771 - INFO - Iteration 10, Epoch 40/50, Loss: 0.0471
+2024-11-19 16:43:25,054 - INFO - Iteration 10, Epoch 50/50, Loss: 0.0377
+2024-11-19 16:43:25,057 - INFO - Iteration 10 - Evaluation results - MAE: 434.76, RMSE: 462.63
+2024-11-19 16:43:25,057 - INFO - Iteration 11 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:25,389 - INFO - Iteration 11, Epoch 10/50, Loss: 0.0640
+2024-11-19 16:43:25,722 - INFO - Iteration 11, Epoch 20/50, Loss: 0.0664
+2024-11-19 16:43:26,021 - INFO - Iteration 11, Epoch 30/50, Loss: 0.0450
+2024-11-19 16:43:26,359 - INFO - Iteration 11, Epoch 40/50, Loss: 0.0350
+2024-11-19 16:43:26,659 - INFO - Iteration 11, Epoch 50/50, Loss: 0.0312
+2024-11-19 16:43:26,662 - INFO - Iteration 11 - Evaluation results - MAE: 419.44, RMSE: 448.10
+2024-11-19 16:43:26,664 - INFO - Iteration 12 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:26,954 - INFO - Iteration 12, Epoch 10/50, Loss: 0.1029
+2024-11-19 16:43:27,246 - INFO - Iteration 12, Epoch 20/50, Loss: 0.0523
+2024-11-19 16:43:27,603 - INFO - Iteration 12, Epoch 30/50, Loss: 0.0517
+2024-11-19 16:43:27,895 - INFO - Iteration 12, Epoch 40/50, Loss: 0.0476
+2024-11-19 16:43:28,176 - INFO - Iteration 12, Epoch 50/50, Loss: 0.0395
+2024-11-19 16:43:28,179 - INFO - Iteration 12 - Evaluation results - MAE: 465.43, RMSE: 491.47
+2024-11-19 16:43:28,179 - INFO - Iteration 13 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:28,458 - INFO - Iteration 13, Epoch 10/50, Loss: 0.1296
+2024-11-19 16:43:28,785 - INFO - Iteration 13, Epoch 20/50, Loss: 0.0679
+2024-11-19 16:43:29,080 - INFO - Iteration 13, Epoch 30/50, Loss: 0.0547
+2024-11-19 16:43:29,358 - INFO - Iteration 13, Epoch 40/50, Loss: 0.0475
+2024-11-19 16:43:29,669 - INFO - Iteration 13, Epoch 50/50, Loss: 0.0461
+2024-11-19 16:43:29,672 - INFO - Iteration 13 - Evaluation results - MAE: 434.35, RMSE: 461.87
+2024-11-19 16:43:29,672 - INFO - Iteration 14 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:29,945 - INFO - Iteration 14, Epoch 10/50, Loss: 0.1258
+2024-11-19 16:43:30,400 - INFO - Iteration 14, Epoch 20/50, Loss: 0.0766
+2024-11-19 16:43:30,678 - INFO - Iteration 14, Epoch 30/50, Loss: 0.0611
+2024-11-19 16:43:30,987 - INFO - Iteration 14, Epoch 40/50, Loss: 0.0546
+2024-11-19 16:43:31,322 - INFO - Iteration 14, Epoch 50/50, Loss: 0.0495
+2024-11-19 16:43:31,327 - INFO - Iteration 14 - Evaluation results - MAE: 564.44, RMSE: 586.02
+2024-11-19 16:43:31,327 - INFO - Iteration 15 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:31,694 - INFO - Iteration 15, Epoch 10/50, Loss: 0.1242
+2024-11-19 16:43:31,994 - INFO - Iteration 15, Epoch 20/50, Loss: 0.0551
+2024-11-19 16:43:32,283 - INFO - Iteration 15, Epoch 30/50, Loss: 0.0551
+2024-11-19 16:43:32,606 - INFO - Iteration 15, Epoch 40/50, Loss: 0.0413
+2024-11-19 16:43:32,926 - INFO - Iteration 15, Epoch 50/50, Loss: 0.0406
+2024-11-19 16:43:32,930 - INFO - Iteration 15 - Evaluation results - MAE: 411.79, RMSE: 440.84
+2024-11-19 16:43:32,930 - INFO - Iteration 16 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:33,209 - INFO - Iteration 16, Epoch 10/50, Loss: 0.0614
+2024-11-19 16:43:33,506 - INFO - Iteration 16, Epoch 20/50, Loss: 0.0746
+2024-11-19 16:43:33,836 - INFO - Iteration 16, Epoch 30/50, Loss: 0.0591
+2024-11-19 16:43:34,125 - INFO - Iteration 16, Epoch 40/50, Loss: 0.0515
+2024-11-19 16:43:34,459 - INFO - Iteration 16, Epoch 50/50, Loss: 0.0445
+2024-11-19 16:43:34,462 - INFO - Iteration 16 - Evaluation results - MAE: 536.64, RMSE: 559.28
+2024-11-19 16:43:34,462 - INFO - Iteration 17 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:35,053 - INFO - Iteration 17, Epoch 10/50, Loss: 0.1157
+2024-11-19 16:43:35,359 - INFO - Iteration 17, Epoch 20/50, Loss: 0.0857
+2024-11-19 16:43:35,673 - INFO - Iteration 17, Epoch 30/50, Loss: 0.0512
+2024-11-19 16:43:35,982 - INFO - Iteration 17, Epoch 40/50, Loss: 0.0539
+2024-11-19 16:43:36,365 - INFO - Iteration 17, Epoch 50/50, Loss: 0.0572
+2024-11-19 16:43:36,369 - INFO - Iteration 17 - Evaluation results - MAE: 576.50, RMSE: 597.59
+2024-11-19 16:43:36,369 - INFO - Iteration 18 starting with parameters: {'num_layers': 3, 'num_heads': 4, 'd_model': 64, 'dim_feedforward': 128, 'learning_rate': 0.0005}
+2024-11-19 16:43:36,674 - INFO - Iteration 18, Epoch 10/50, Loss: 0.0521
+2024-11-19 16:43:37,012 - INFO - Iteration 18, Epoch 20/50, Loss: 0.0394
+2024-11-19 16:43:37,337 - INFO - Iteration 18, Epoch 30/50, Loss: 0.0257
+2024-11-19 16:43:37,642 - INFO - Iteration 18, Epoch 40/50, Loss: 0.0264
+2024-11-19 16:43:37,970 - INFO - Iteration 18, Epoch 50/50, Loss: 0.0211
+2024-11-19 16:43:37,973 - INFO - Iteration 18 - Evaluation results - MAE: 273.07, RMSE: 310.51
+2024-11-19 16:43:37,973 - INFO - New best model found: {'num_layers': 4, 'num_heads': 6, 'd_model': 128, 'dim_feedforward': 256, 'learning_rate': 0.00025} with RMSE: 310.51
+2024-11-19 16:43:37,973 - INFO - Iteration 19 starting with parameters: {'num_layers': 4, 'num_heads': 6, 'd_model': 128, 'dim_feedforward': 256, 'learning_rate': 0.00025}
