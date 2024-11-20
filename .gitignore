@@ -5,3 +5,5 @@ __pycache__/
 data/cafecast_data.xlsx
 
 models/
+
+logs/
