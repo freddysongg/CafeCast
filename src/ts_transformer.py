@@ -1,5 +1,7 @@
 import warnings
 
+import joblib
+
 from lstm import remove_existing_model
 warnings.filterwarnings("ignore", "urllib3 v2 only supports OpenSSL")
 
@@ -177,13 +179,50 @@ def remove_existing_model(model_dir):
             os.remove(file_path)
             logger.info(f"Deleted old model file: {file_path}")
 
-def main():
-    cleanup_old_logs(LOG_DIR)
+def view_model_parameters(model):
+    logger.info("Viewing Model Parameters:")
+    for name, param in model.named_parameters():
+        logger.info(f"Layer: {name} | Size: {list(param.size())}")
+        
+def save_scaler(scaler, path="models/scaler.pkl"):
+    joblib.dump(scaler, path)
+    logger.info(f"Scaler saved to {path}")
 
-    # Option to clear saved parameters
-    # if len(sys.argv) > 1 and sys.argv[1] == 'clear_params':
-    #     clear_params()
-    #     return
+def load_scaler(path="models/scaler.pkl"):
+    if os.path.exists(path):
+        logger.info(f"Scaler loaded from {path}")
+        return joblib.load(path)
+    else:
+        logger.error(f"No scaler found at {path}. Ensure the scaler is saved during training.")
+        return None
+    
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == '--view-params':
+        logger.info("Viewing parameters of the best Transformer model...")
+        model_path = os.path.join(MODEL_DIR, 'best_ts_transformer_model.pt')
+
+        if not os.path.exists(model_path):
+            logger.error(f"No saved model found at {model_path}")
+            return
+
+        best_params = load_best_params()
+        if not best_params:
+            logger.error("No saved parameters found.")
+            return
+
+        logger.info(f"Loading model with parameters: {best_params}")
+        model = TimeSeriesTransformer(
+            input_size=best_params['d_model'],
+            num_layers=best_params['num_layers'],
+            num_heads=best_params['num_heads'],
+            d_model=best_params['d_model'],
+            dim_feedforward=best_params['dim_feedforward']
+        )
+        model.load_state_dict(torch.load(model_path))
+        view_model_parameters(model)
+        return
+    
+    cleanup_old_logs(LOG_DIR)
 
     logger.info("Starting Transformer model script")
 
@@ -197,6 +236,9 @@ def main():
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
 
+    # Save the scaler
+    save_scaler(scaler, os.path.join(MODEL_DIR, 'scaler.pkl'))
+
     SEQ_LENGTH = 10  # Base sequence length
     X, y = create_sequences(scaled_data, SEQ_LENGTH)
     train_size = int(len(X) * 0.8)
@@ -209,85 +251,13 @@ def main():
     best_params = load_best_params() or {'num_layers': 2, 'num_heads': 2, 'd_model': 64, 'dim_feedforward': 128}
     logger.info(f"Starting with initial best parameters: {best_params}")
 
-    # Test each parameter
-    param_names = ['num_layers', 'num_heads', 'd_model', 'dim_feedforward']
-    param_ranges = {
-        'num_layers': [max(1, best_params['num_layers'] + delta) for delta in range(-1, 3)],
-        'num_heads': [h for h in range(1, best_params['d_model'] + 1) if best_params['d_model'] % h == 0],
-        'd_model': [max(32, best_params['d_model'] + delta) for delta in range(-16, 17, 16)],
-        'dim_feedforward': [max(64, best_params['dim_feedforward'] + delta) for delta in range(-64, 129, 64)]
-    }
-
-    for param_name in param_names:
-        metrics_history = []
-        tested_count = 0
-        explored_combinations = set()
-
-        def is_combination_explored(params):
-            param_tuple = tuple(sorted(params.items()))
-            return param_tuple in explored_combinations
-
-        def add_combination_to_explored(params):
-            param_tuple = tuple(sorted(params.items()))
-            explored_combinations.add(param_tuple)
-
-        for param_value in param_ranges[param_name]:
-            if tested_count >= 20:  # Limit to 10 tests per parameter
-                break
-
-            temp_params = best_params.copy()
-            temp_params[param_name] = param_value
-
-            # Check if the combination has already been tested
-            if is_combination_explored(temp_params):
-                logger.info(f"Skipping already tested combination: {temp_params}")
-                continue
-
-            add_combination_to_explored(temp_params)
-
-            try:
-                logger.info(f"Testing {param_name}={param_value}")
-                model, mae, rmse, val_loss = train_and_evaluate_model(
-                    X_train, X_test, y_train, y_test, 
-                    **temp_params, learning_rate=0.001, scaler=scaler
-                )
-
-                # Skip invalid results
-                if model is None or mae is None or rmse is None or val_loss is None:
-                    logger.warning(f"Invalid results for {param_name}={param_value}, skipping.")
-                    continue
-
-                metrics_history.append({
-                    param_name: param_value,
-                    'mae': mae,
-                    'rmse': rmse,
-                    'val_loss': val_loss
-                })
-                logger.info(f"{param_name}={param_value} - MAE: {mae:.2f}, RMSE: {rmse:.2f}, Final Val Loss: {val_loss:.4f}")
-                tested_count += 1
-            except Exception as e:
-                logger.error(f"Error testing {param_name}={param_value}: {e}")
-
-        # Plot metrics and find the best parameter value
-        if metrics_history:
-            plot_metrics(metrics_history, param_name)
-            best_entry = min(metrics_history, key=lambda x: x['rmse'])
-            best_params[param_name] = best_entry[param_name]
-            logger.info(f"Best {param_name} found: {best_params[param_name]} with RMSE: {best_entry['rmse']:.2f}")
-        else:
-            logger.warning(f"No valid results for {param_name}, skipping optimization.")
-
-    # Save the updated best parameters
-    save_best_params(best_params)
-
-    # Remove existing model before saving the new best model
-    remove_existing_model(MODEL_DIR)
-
-    # Save the final best model
+    # Train and save the best model
     final_model, mae, rmse, val_loss = train_and_evaluate_model(
-        X_train, X_test, y_train, y_test, 
+        X_train, X_test, y_train, y_test,
         **best_params, learning_rate=0.001, scaler=scaler
     )
+
+    # Save the model
     model_path = os.path.join(MODEL_DIR, 'best_ts_transformer_model.pt')
     torch.save(final_model.state_dict(), model_path)
     logger.info(f"Best model saved to {model_path}")

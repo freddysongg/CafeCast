@@ -1,4 +1,6 @@
 import warnings
+
+import joblib
 warnings.filterwarnings("ignore", "urllib3 v2 only supports OpenSSL")
 
 import os
@@ -177,6 +179,19 @@ def remove_existing_model_if_better(new_rmse):
         logger.info(f"Deleted old model file: {model_path}")
     return True
 
+def save_scaler(scaler, path="models/scaler.pkl"):
+    joblib.dump(scaler, path)
+    logger.info(f"Scaler saved to {path}")
+    
+def load_scaler(path="models/scaler.pkl"):
+    if os.path.exists(path):
+        logger.info(f"Scaler loaded from {path}")
+        return joblib.load(path)
+    else:
+        logger.error(f"No scaler found at {path}. Ensure the scaler is saved during training.")
+        return None
+            
+
 def main():
     logger.info("Loading and preparing data")
     data = prepare_data('data/cafecast_data.xlsx')
@@ -185,6 +200,7 @@ def main():
 
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
+    save_scaler(scaler, os.path.join(MODEL_DIR, 'scaler.pkl'))
 
     SEQ_LENGTH = 10
     X, y = create_sequences(scaled_data, SEQ_LENGTH)

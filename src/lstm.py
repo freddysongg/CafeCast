@@ -1,4 +1,6 @@
 import warnings
+
+import joblib
 warnings.filterwarnings("ignore", "urllib3 v2 only supports OpenSSL")
 
 import os
@@ -185,6 +187,18 @@ def remove_existing_model_if_better(new_rmse):
     # If no existing metrics or new model is better, delete the existing model
     remove_existing_model(MODEL_DIR)
     return True
+
+def save_scaler(scaler, path="models/scaler.pkl"):
+    joblib.dump(scaler, path)
+    logger.info(f"Scaler saved to {path}")
+    
+def load_scaler(path="models/scaler.pkl"):
+    if os.path.exists(path):
+        logger.info(f"Scaler loaded from {path}")
+        return joblib.load(path)
+    else:
+        logger.error(f"No scaler found at {path}. Ensure the scaler is saved during training.")
+        return None
             
 def test_parameters(param_name, param_list, best_params, X_train, X_test, y_train, y_test, SEQ_LENGTH, scaler, test_count=20):
     metrics_history = []
@@ -284,6 +298,7 @@ def main():
     # Scale the data
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
+    save_scaler(scaler, os.path.join(MODEL_DIR, 'scaler.pkl'))
 
     SEQ_LENGTH = 10  # Base sequence length
     X, y = create_sequences(scaled_data, SEQ_LENGTH)
