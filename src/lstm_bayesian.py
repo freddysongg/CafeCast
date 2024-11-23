@@ -150,6 +150,33 @@ def bayesian_optimize(X, y, SEQ_LENGTH, scaler):
 
     return best_params_converted
 
+def load_best_model_metrics():
+    metrics_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model_metrics.json')
+    if os.path.exists(metrics_path):
+        with open(metrics_path, 'r') as f:
+            return json.load(f)
+    return None
+
+def save_best_model_metrics(metrics):
+    metrics_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model_metrics.json')
+    with open(metrics_path, 'w') as f:
+        json.dump(metrics, f, indent=4)
+    logger.info(f"Best model metrics saved to {metrics_path}")
+
+def remove_existing_model_if_better(new_rmse):
+    best_metrics = load_best_model_metrics()
+    if best_metrics is not None:
+        best_rmse = best_metrics.get('rmse', float('inf'))
+        if new_rmse >= best_rmse:
+            logger.info(f"New model RMSE ({new_rmse:.2f}) is not better than existing best RMSE ({best_rmse:.2f}). Keeping the old model.")
+            return False
+    # If no existing metrics or new model is better, delete the existing model
+    model_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model.keras')
+    if os.path.exists(model_path):
+        os.remove(model_path)
+        logger.info(f"Deleted old model file: {model_path}")
+    return True
+
 def main():
     logger.info("Loading and preparing data")
     data = prepare_data('data/cafecast_data.xlsx')
@@ -174,17 +201,22 @@ def main():
     logger.info(f"Training final model with best parameters: {best_params}")
     final_model, mae, rmse, training_loss, val_loss = train_and_evaluate_model(
         X_train, X_test, y_train, y_test,
-        num_units=best_params['num_units'],
-        batch_size=best_params['batch_size'],
-        epochs=best_params['epochs'],
+        num_units=int(best_params['num_units']),
+        batch_size=int(best_params['batch_size']),
+        epochs=int(best_params['epochs']),
         learning_rate=0.001,
         SEQ_LENGTH=SEQ_LENGTH,
         scaler=scaler
     )
 
-    model_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model.keras')
-    final_model.save(model_path)
-    logger.info(f"Final best model saved to {model_path}")
+    # Compare the new model with the existing best model
+    if remove_existing_model_if_better(rmse):
+        model_path = os.path.join(MODEL_DIR, 'best_lstm_bayesian_model.keras')
+        final_model.save(model_path)
+        logger.info(f"New best model saved to {model_path}")
+        save_best_model_metrics({'mae': mae, 'rmse': rmse, 'training_loss': training_loss, 'val_loss': val_loss})
+    else:
+        logger.info("New model was not better. Existing best model retained.")
 
 if __name__ == "__main__":
     main()

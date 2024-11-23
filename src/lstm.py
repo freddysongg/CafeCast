@@ -158,9 +158,33 @@ def clear_params():
 def remove_existing_model(model_dir):
     for file in os.listdir(model_dir):
         file_path = os.path.join(model_dir, file)
-        if os.path.isfile(file_path) and file_path.endswith('.keras'):
+        if os.path.isfile(file_path) and file_path.endswith('best_lstm_model.keras'):
             os.remove(file_path)
             logger.info(f"Deleted old model file: {file_path}")
+            
+def load_best_model_metrics():
+    metrics_path = os.path.join(MODEL_DIR, 'best_lstm_model_metrics.json')
+    if os.path.exists(metrics_path):
+        with open(metrics_path, 'r') as f:
+            return json.load(f)
+    return None
+
+def save_best_model_metrics(metrics):
+    metrics_path = os.path.join(MODEL_DIR, 'best_lstm_model_metrics.json')
+    with open(metrics_path, 'w') as f:
+        json.dump(metrics, f, indent=4)
+    logger.info(f"Best model metrics saved to {metrics_path}")
+
+def remove_existing_model_if_better(new_rmse):
+    best_metrics = load_best_model_metrics()
+    if best_metrics is not None:
+        best_rmse = best_metrics.get('rmse', float('inf'))
+        if new_rmse >= best_rmse:
+            logger.info(f"New model RMSE ({new_rmse}) is not better than existing best RMSE ({best_rmse}). Keeping the old model.")
+            return False
+    # If no existing metrics or new model is better, delete the existing model
+    remove_existing_model(MODEL_DIR)
+    return True
             
 def test_parameters(param_name, param_list, best_params, X_train, X_test, y_train, y_test, SEQ_LENGTH, scaler, test_count=20):
     metrics_history = []
@@ -319,18 +343,22 @@ def main():
         avg_mae, avg_rmse, avg_training_loss, avg_val_loss = summary
     else:
         logger.error("Failed to generate a summary of the best results.")
-        # Remove existing model before saving the new best model
-        remove_existing_model(MODEL_DIR)
 
-    # Save the final best model
+    # Train the final model and evaluate its performance
     final_model, mae, rmse, training_loss, val_loss = train_and_evaluate_model(
         X_train, X_test, y_train, y_test,
         best_params['num_units'], best_params['batch_size'],
         best_params['epochs'], 0.001, SEQ_LENGTH, scaler
     )
-    model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
-    final_model.save(model_path)
-    logger.info(f"Best model saved to {model_path}")
+    
+    # Compare the new model with the existing best model
+    if remove_existing_model_if_better(rmse):
+        model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
+        final_model.save(model_path)
+        logger.info(f"New best model saved to {model_path}")
+        save_best_model_metrics({'mae': mae, 'rmse': rmse, 'training_loss': training_loss, 'val_loss': val_loss})
+    else:
+        logger.info("New model was not better. Existing best model retained.")
 
 if __name__ == "__main__":
     main()
