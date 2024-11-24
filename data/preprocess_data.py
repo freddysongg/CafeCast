@@ -1,46 +1,59 @@
-
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import json
+import os
 
 def prepare_data(file_path, date_col='transaction_date', time_col='transaction_time'):
+    """
+    Prepares the data by processing date and time columns.
+
+    Args:
+        file_path (str): Path to the input Excel file.
+        date_col (str): Name of the date column.
+        time_col (str): Name of the time column.
+
+    Returns:
+        pd.DataFrame: Processed DataFrame with date and time columns handled.
+    """
     data = pd.read_excel(file_path, engine='openpyxl')
     
-    # Convert date column to datetime
     data[date_col] = pd.to_datetime(data[date_col])
     
-    # Set the date column as the index
     data.set_index(date_col, inplace=True)
     
-    # Extract transaction hour if the time column exists
     if time_col in data.columns:
         data['transaction_hour'] = data[time_col].apply(lambda x: x.hour)
     
     return data
 
 def generate_test_data(file_path, output_file='test_payload.json', seq_length=10):
-    # Prepare data
+    """
+    Generates test data payloads for model inference.
+
+    Args:
+        file_path (str): Path to the input Excel file.
+        output_file (str): Path to save the JSON test payload.
+        seq_length (int): Length of sequences for test data.
+
+    Returns:
+        None: Saves the test payload as a JSON file.
+    """
     data = prepare_data(file_path)
     
-    # Resample to daily transaction quantities
     daily_data = data.resample('D')['transaction_qty'].sum()
     
-    # Scale the data
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
     
-    # Generate sequences
     sequences = [
         scaled_data[i:i + seq_length].flatten().tolist()
         for i in range(len(scaled_data) - seq_length)
     ]
     
-    # Create a sample payload with the first sequence
     if sequences:
-        test_data = {"data": sequences[0]}  # Taking the first sequence for testing
+        test_data = {"data": sequences[0]}  
         
-        # Save the test payload to a JSON file
         with open(output_file, 'w') as f:
             json.dump(test_data, f)
         
@@ -48,20 +61,55 @@ def generate_test_data(file_path, output_file='test_payload.json', seq_length=10
     else:
         print("Not enough data to generate sequences. Please ensure the dataset is sufficient.")
 
-def process_data(file_path, output_path):
-    data = pd.read_csv(file_path)
+def correlate_product_info(input_file, output_file):
+    """
+    Correlates product_id with product_category, product_type, and product_detail,
+    and creates a mapping table.
 
-    # Convert `transaction_date` to datetime
+    Args:
+        input_file (str): Path to the input CSV file with coffee shop data.
+        output_file (str): Path to save the updated CSV file with correlated product info.
+
+    Returns:
+        None: Saves the updated file to `output_file`.
+    """
+    data = pd.read_csv(input_file)
+
+    required_columns = ['product_id', 'product_category', 'product_type', 'product_detail']
+    for column in required_columns:
+        if column not in data.columns:
+            raise ValueError(f"Column '{column}' not found in the dataset.")
+
+    product_mapping = data[['product_id', 'product_category', 'product_type', 'product_detail']].drop_duplicates()
+
+    mapping_file = os.path.join(os.path.dirname(output_file), 'product_mapping.csv')
+    product_mapping.to_csv(mapping_file, index=False)
+    print(f"Product mapping saved to {mapping_file}")
+
+    data = pd.merge(data, product_mapping, on='product_id', how='left')
+
+    data.to_csv(output_file, index=False)
+    print(f"Updated dataset saved to {output_file}")
+
+def process_data(file_path, output_path):
+    """
+    Processes the data by adding new features and saving the result.
+
+    Args:
+        file_path (str): Path to the input file.
+        output_path (str): Path to save the processed file.
+
+    Returns:
+        pd.DataFrame: Processed DataFrame.
+    """
+    data = pd.read_excel(file_path, engine='openpyxl')
+
     data['transaction_date'] = pd.to_datetime(data['transaction_date'])
 
-    # Add new columns
-    # 1. Date (Day)
     data['date'] = data['transaction_date'].dt.day
 
-    # 2. Month (Full Month Name)
     data['month'] = data['transaction_date'].dt.month_name()
 
-    # 3. Time distribution (Group times into categories)
     data['transaction_time'] = pd.to_datetime(data['transaction_time'], format='%H:%M:%S')
     data['time_distribution'] = pd.cut(
         data['transaction_time'].dt.hour,
@@ -71,10 +119,8 @@ def process_data(file_path, output_path):
         include_lowest=True
     )
 
-    # 4. Revenue (transaction_qty * unit_price)
     data['revenue'] = data['transaction_qty'] * data['unit_price']
 
-    # Save the processed data to a new file
     data.to_csv(output_path, index=False)
     print(f"Processed data saved to {output_path}")
 
@@ -82,12 +128,13 @@ def process_data(file_path, output_path):
 
 if __name__ == "__main__":
     input_file = 'data/cafecast_data.xlsx' 
-    output_file = 'data/processed_coffee_shop_data.csv'  # Replace with your desired output file
+    output_file = 'data/processed_coffee_shop_data.csv'
+    product_id_output_file = 'data/product_correlation_data.csv'
 
-    processed_data = process_data(input_file, output_file)
-    print(processed_data.head())
+    # processed_data = process_data(input_file, output_file)
+    # print(processed_data.head())
 
-    # Example usage for generating test data
-    excel_file = 'data/cafecast_data.xlsx'  
-    test_output = 'test_payload.json'
-    generate_test_data(excel_file, test_output)
+    # test_output = 'test_payload.json'
+    # generate_test_data(input_file, test_output)
+
+    correlate_product_info(output_file, product_id_output_file)
