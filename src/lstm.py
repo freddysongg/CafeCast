@@ -82,17 +82,18 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_
 
 def save_best_params(best_params):
     """
-    Saves the best parameters dynamically as the training progresses.
+    Saves the best parameters dynamically to a JSON file. Handles both single
+    parameter sets and lists of parameter sets.
 
     Args:
-        best_params (dict): The best parameters to save.
+        best_params (dict): A dictionary containing the best parameters to save.
     """
     params_path = os.path.join(PARAMS_DIR, 'best_lstm_params.json')
 
     required_keys = ['num_units', 'batch_size', 'epochs', 'learning_rate']
     for key in required_keys:
         if key not in best_params:
-            logger.warning(f"Missing parameter '{key}' in best_params before saving. Adding default value.")
+            logger.warning(f"Missing parameter '{key}' in best_params. Adding default value.")
             if key == 'learning_rate':
                 best_params[key] = 0.001
             elif key == 'num_units':
@@ -102,14 +103,30 @@ def save_best_params(best_params):
             elif key == 'epochs':
                 best_params[key] = 50
 
+    if os.path.exists(params_path):
+        with open(params_path, 'r') as f:
+            try:
+                existing_params = json.load(f)
+                if not isinstance(existing_params, list):
+                    logger.warning(f"Existing params are not in list format. Overwriting with a list.")
+                    existing_params = []
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode JSON. Overwriting with a new list.")
+                existing_params = []
+    else:
+        existing_params = []
+
+    existing_params.append(best_params)
+
     with open(params_path, 'w') as f:
-        json.dump(best_params, f, indent=4)
-    logger.info(f"Best parameters saved dynamically to {params_path}")
+        json.dump(existing_params, f, indent=4)
+    logger.info(f"Best parameters appended and saved to {params_path}")
+
 
 def load_best_params():
     """
-    Loads the best parameters from a JSON file. If some keys are missing,
-    default values are added.
+    Loads the most recent parameters from a JSON file. If the file contains a list,
+    use the last entry. If keys are missing, default values are added.
 
     Returns:
         dict: Best parameters with all required keys.
@@ -120,17 +137,28 @@ def load_best_params():
 
     if os.path.exists(params_path):
         with open(params_path, 'r') as f:
-            params = json.load(f)
+            try:
+                params = json.load(f)
 
-            for key, default_value in default_params.items():
-                if key not in params:
-                    logger.warning(f"Key '{key}' missing in loaded params. Adding default value: {default_value}")
-                    params[key] = default_value
+                if isinstance(params, list) and len(params) > 0:
+                    params = params[-1]  # Use the last entry
+                elif not isinstance(params, dict):
+                    logger.warning(f"Invalid format in {params_path}. Using default parameters.")
+                    return default_params
 
-            return params
+                for key, default_value in default_params.items():
+                    if key not in params:
+                        logger.warning(f"Key '{key}' missing in loaded params. Adding default value: {default_value}")
+                        params[key] = default_value
+
+                return params
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode JSON in {params_path}. Using default parameters.")
+                return default_params
 
     logger.warning(f"Parameters file '{params_path}' not found. Using default parameters.")
     return default_params
+
 
 def dynamic_param_tuning(best_params, gradient):
     """

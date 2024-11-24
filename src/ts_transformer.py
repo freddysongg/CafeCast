@@ -108,7 +108,7 @@ def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_heads, num_la
 
 def save_best_params(best_params):
     """
-    Dynamically saves the best parameters.
+    Dynamically saves the best parameters to a JSON file.
 
     Args:
         best_params (dict): The best parameters to save.
@@ -138,8 +138,7 @@ def save_best_params(best_params):
 
 def load_best_params():
     """
-    Loads the best parameters from a JSON file. If some keys are missing,
-    default values are added.
+    Loads the most recent parameters from a JSON file. Uses default values if the file is not found or incomplete.
 
     Returns:
         dict: Best parameters with all required keys.
@@ -151,6 +150,12 @@ def load_best_params():
     if os.path.exists(params_path):
         with open(params_path, 'r') as f:
             params = json.load(f)
+
+            if isinstance(params, list):
+                if len(params) == 0:
+                    logger.warning(f"Parameters file '{params_path}' is empty. Using default parameters.")
+                    return default_params
+                params = params[-1]  
 
             for key, default_value in default_params.items():
                 if key not in params:

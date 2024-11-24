@@ -11,9 +11,9 @@ import joblib
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from tensorflow.keras.models import Sequential # type: ignore
-from tensorflow.keras.layers import LSTM, Dense, Input # type: ignore
-from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.models import Sequential  # type: ignore
+from tensorflow.keras.layers import LSTM, Dense, Input  # type: ignore
+from tensorflow.keras.optimizers import Adam  # type: ignore
 from bayes_opt import BayesianOptimization
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../data')))
 from preprocess_data import process_data
@@ -107,8 +107,8 @@ def save_best_params(best_params):
 
 def load_best_params():
     """
-    Loads the best parameters from a JSON file. If some keys are missing,
-    default values are added.
+    Loads the most recent parameters from a JSON file. If the file contains a list,
+    the last entry is used. If keys are missing, default values are added.
 
     Returns:
         dict: Best parameters with all required keys.
@@ -120,6 +120,12 @@ def load_best_params():
     if os.path.exists(params_path):
         with open(params_path, 'r') as f:
             params = json.load(f)
+
+            if isinstance(params, list):
+                if len(params) == 0:
+                    logger.warning(f"Parameters file '{params_path}' is empty. Using default parameters.")
+                    return default_params
+                params = params[-1] 
 
             for key, default_value in default_params.items():
                 if key not in params:
