@@ -12,7 +12,7 @@ from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Input, LayerNormalization, Dropout # type: ignore
+from tensorflow.keras.layers import Embedding, Concatenate, LayerNormalization, GlobalAveragePooling1D, Dropout, Dense, Input # type: ignore
 from tensorflow.keras.models import Model # type: ignore
 from tensorflow.keras.optimizers import Adam # type: ignore
 from tensorflow.keras.optimizers.schedules import ExponentialDecay # type: ignore
@@ -33,27 +33,29 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 logger = logging.getLogger()
 
-def create_sequences(data, seq_length, target_indices):
+def create_sequences(data, product_ids, seq_length, target_indices):
     """
-    Creates input-output sequences for time-series forecasting.
+    Creates input-output sequences for time-series forecasting with product-level inputs.
 
     Args:
         data (np.array): Array of shape (time_steps, features).
+        product_ids (np.array): Array of product IDs corresponding to each time step.
         seq_length (int): Length of each input sequence.
         target_indices (list): Indices of target columns in the data.
 
     Returns:
-        np.array, np.array: Input sequences (X) and target outputs (y).
+        np.array, np.array, np.array: Product IDs, input sequences (X), and target outputs (y).
     """
-    X, y = [], []
+    X, y, products = [], [], []
     for i in range(len(data) - seq_length):
         X.append(data[i:i + seq_length])
         y.append(data[i + seq_length, target_indices])
-    return np.array(X), np.array(y)
+        products.append(product_ids[i:i + seq_length])
+    return np.array(products), np.array(X), np.array(y)
 
-def build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, dropout_rate):
+def build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, num_products, dropout_rate):
     """
-    Builds a Transformer model for time-series forecasting.
+    Builds a Transformer model for time-series forecasting with product embeddings.
 
     Args:
         seq_length (int): Length of input sequences.
@@ -63,47 +65,65 @@ def build_transformer_model(seq_length, num_features, num_heads, num_layers, d_m
         d_model (int): Embedding dimension.
         ff_dim (int): Feedforward dimension.
         target_size (int): Number of output targets.
+        num_products (int): Number of unique products (for embedding).
         dropout_rate (float): Dropout rate.
 
     Returns:
         tf.keras.Model: Compiled Transformer model.
     """
-    inputs = Input(shape=(seq_length, num_features))
-    x = Dense(d_model)(inputs)
-    x = LayerNormalization()(x)
+    
+    product_input = Input(shape=(seq_length,), name='product_id')
+    product_embedding = Embedding(input_dim=num_products, output_dim=d_model)(product_input)
+
+    numerical_input = Input(shape=(seq_length, num_features), name='numerical_features')
+    numerical_projection = Dense(d_model)(numerical_input) 
+
+    combined = Concatenate()([numerical_projection, product_embedding])
+    combined = Dense(d_model)(combined)  
+    x = LayerNormalization()(combined)
 
     for _ in range(num_layers):
         attention_output = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model)(x, x)
         x = LayerNormalization()(x + attention_output)
+
         feed_forward_output = Dense(ff_dim, activation='relu')(x)
+        feed_forward_output = Dense(d_model)(feed_forward_output)  
         x = LayerNormalization()(x + feed_forward_output)
 
+    x = GlobalAveragePooling1D()(x)
     x = Dropout(dropout_rate)(x)
-    x = tf.reduce_mean(x, axis=1)  # Global average pooling
     outputs = Dense(target_size)(x)
 
-    model = Model(inputs, outputs)
+    model = Model(inputs=[product_input, numerical_input], outputs=outputs)
     return model
 
-def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_heads, num_layers, d_model, ff_dim, learning_rate, dropout_rate, seq_length, target_size):
+def train_and_evaluate_model(inputs_train, inputs_test, y_train, y_test, num_heads, num_layers, d_model, ff_dim, learning_rate, dropout_rate, seq_length, target_size):
     """
     Trains and evaluates the Transformer model.
 
     Args:
-        Various model hyperparameters.
+        inputs_train (list): [product_train, X_train] for training.
+        inputs_test (list): [product_test, X_test] for testing.
+        Various hyperparameters.
 
     Returns:
-        float: RMSE of the model.
+        Trained model, RMSE, and validation loss.
     """
+    product_train, X_train = inputs_train
+    product_test, X_test = inputs_test
+
     num_features = X_train.shape[2]
-    model = build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, dropout_rate)
-    lr_schedule = ExponentialDecay(initial_learning_rate=learning_rate, decay_steps=1000, decay_rate=0.9)
-    model.compile(optimizer=Adam(learning_rate=lr_schedule), loss='mse')
+    num_products = product_train.max() + 1  
 
-    history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=0)
+    model = build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, num_products, dropout_rate)
 
-    predictions = model.predict(X_test)
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
+
+    history = model.fit([product_train, X_train], y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=0)
+
+    predictions = model.predict([product_test, X_test])
     rmse = np.sqrt(mean_squared_error(y_test, predictions))
+
     return model, rmse, history.history['val_loss'][-1]
 
 def save_best_params(best_params):
@@ -171,8 +191,12 @@ def main():
     logger.info("Loading and preprocessing data")
     processed_file = 'data/processed_coffee_shop_data.csv'
     df = process_data(processed_file, 'data/ts_transformer_output.csv')
+    
+    unique_products = df['product_id'].unique()
+    product_mapping = {product: idx for idx, product in enumerate(unique_products)}
+    df['product_id'] = df['product_id'].map(product_mapping)
 
-    features = ['transaction_qty', 'revenue']
+    features = ['transaction_qty', 'revenue'] + [col for col in df.columns if col.startswith('dow_') or col.startswith('month_')]
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(df[features])
 
@@ -182,11 +206,12 @@ def main():
 
     seq_length = 10
     target_indices = [0, 1]
-    X, y = create_sequences(scaled_data, seq_length, target_indices)
+    product_sequences, X, y = create_sequences(scaled_data, df['product_id'].values, seq_length, target_indices)
 
     train_size = int(len(X) * 0.8)
     X_train, X_test = X[:train_size], X[train_size:]
     y_train, y_test = y[:train_size], y[train_size:]
+    product_train, product_test = product_sequences[:train_size], product_sequences[train_size:]
 
     best_params = load_best_params()
     logger.info(f"Starting with best parameters: {best_params}")
@@ -197,10 +222,10 @@ def main():
     for iteration in range(10):  # Max 10 iterations
         logger.info(f"Iteration {iteration + 1}: Testing parameters {best_params}")
         model, rmse, val_loss = train_and_evaluate_model(
-            X_train, X_test, y_train, y_test,
-            best_params['num_heads'], best_params['num_layers'], best_params['d_model'],
-            best_params['ff_dim'], best_params['learning_rate'], best_params['dropout_rate'],
-            seq_length, len(target_indices)
+            [product_train, X_train], [product_test, X_test],
+            y_train, y_test, best_params['num_heads'], best_params['num_layers'],
+            best_params['d_model'], best_params['ff_dim'], best_params['learning_rate'],
+            best_params['dropout_rate'], seq_length, len(target_indices)
         )
         logger.info(f"Results: RMSE={rmse:.2f}, Validation Loss={val_loss:.4f}")
 

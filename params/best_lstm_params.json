@@ -8,5 +8,17 @@
         "num_units": 50,
         "batch_size": 40,
         "epochs": 100
+    },
+    {
+        "num_units": 50,
+        "batch_size": 40,
+        "epochs": 100,
+        "learning_rate": 0.001
+    },
+    {
+        "num_units": 48,
+        "batch_size": 38,
+        "epochs": 100,
+        "learning_rate": 0.00096
     }
 ]
