@@ -11,9 +11,9 @@ import joblib
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from tensorflow.keras.models import Sequential # type: ignore
-from tensorflow.keras.layers import LSTM, Dense, Input # type: ignore
-from tensorflow.keras.optimizers import Adam # type: ignore
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../data')))
 from preprocess_data import process_data
@@ -50,35 +50,50 @@ def create_sequences(data, seq_length, target_indices):
         y.append(data[i + seq_length, target_indices])
     return np.array(X), np.array(y)
 
-def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, seq_length, target_size):
+class LSTMModel(nn.Module):
+    def __init__(self, input_size, num_units, target_size):
+        super(LSTMModel, self).__init__()
+        self.lstm = nn.LSTM(input_size, num_units, batch_first=True)
+        self.fc = nn.Linear(num_units, target_size)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = self.fc(out[:, -1, :])  
+        return out
+
+def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, seq_length, target_size, device):
     """
-    Trains and evaluates an LSTM model.
-
-    Args:
-        X_train, X_test, y_train, y_test: Training and testing data.
-        num_units (int): Number of units in the LSTM layer.
-        batch_size (int): Batch size for training.
-        epochs (int): Number of training epochs.
-        learning_rate (float): Learning rate for the optimizer.
-        seq_length (int): Sequence length for the input data.
-        target_size (int): Number of output targets.
-
-    Returns:
-        Trained model, float, float: Trained model, MAE, and RMSE.
+    Trains and evaluates an LSTM model using PyTorch.
     """
-    model = Sequential([
-        Input(shape=(seq_length, X_train.shape[2])),
-        LSTM(units=num_units, activation='relu'),
-        Dense(target_size)
-    ])
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
+    input_size = X_train.shape[2]
+    model = LSTMModel(input_size, num_units, target_size).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.1, verbose=0)
+    train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    predictions = model.predict(X_test)
-    mae = mean_absolute_error(y_test, predictions)
-    rmse = np.sqrt(mean_squared_error(y_test, predictions))
-    return model, mae, rmse, history.history['val_loss'][-1]
+    model.train()
+    for epoch in range(epochs):
+        for X_batch, y_batch in train_loader:
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(X_batch)
+            loss = criterion(outputs, y_batch)
+            loss.backward()
+            optimizer.step()
+
+    model.eval()
+    with torch.no_grad():
+        X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+        y_test_tensor = torch.tensor(y_test, dtype=torch.float32).to(device)
+
+        predictions = model(X_test_tensor).cpu().numpy()
+        mae = mean_absolute_error(y_test, predictions)
+        rmse = np.sqrt(mean_squared_error(y_test, predictions))
+    
+    return model, mae, rmse
 
 def save_best_params(best_params):
     """
@@ -206,6 +221,8 @@ def main():
     X_train, X_test = X[:train_size], X[train_size:]
     y_train, y_test = y[:train_size], y[train_size:]
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     best_params = load_best_params() or {'num_units': 128, 'batch_size': 32, 'epochs': 50, 'learning_rate': 0.001}
     logger.info(f"Starting with best parameters: {best_params}")
 
@@ -214,30 +231,23 @@ def main():
 
     for iteration in range(10):  # Max 10 iterations
         logger.info(f"Iteration {iteration + 1}: Testing parameters {best_params}")
-        model, mae, rmse, val_loss = train_and_evaluate_model(
+        model, mae, rmse = train_and_evaluate_model(
             X_train, X_test, y_train, y_test,
             best_params['num_units'], best_params['batch_size'], best_params['epochs'],
-            best_params['learning_rate'], seq_length, len(target_indices)
+            best_params['learning_rate'], seq_length, len(target_indices), device
         )
-        logger.info(f"Results: MAE={mae:.2f}, RMSE={rmse:.2f}, Validation Loss={val_loss:.4f}")
+        logger.info(f"Results: MAE={mae:.2f}, RMSE={rmse:.2f}")
 
         if rmse < best_rmse:
             logger.info(f"New best RMSE found: {rmse:.2f}")
             best_rmse = rmse
-
-            model.save(os.path.join(MODEL_DIR, 'best_lstm_model.keras'))
+            torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'best_lstm_model.pth'))
             save_best_params(best_params)
             logger.info(f"Updated best parameters: {best_params}")
-
-            # Adjust gradient to tune parameters
-            gradient = {'num_units': 'increase', 'batch_size': 'decrease', 'learning_rate': 'decrease'}
             no_improvement_count = 0
         else:
             logger.info("No improvement in RMSE.")
-            gradient = {'num_units': 'decrease', 'batch_size': 'increase', 'learning_rate': 'increase'}
             no_improvement_count += 1
-
-        best_params = dynamic_param_tuning(best_params, gradient)
 
         if no_improvement_count >= 3:
             logger.info("No improvement for 3 iterations. Stopping early.")

@@ -31,7 +31,6 @@ def clear_params(model_type):
         logger.info(f"No parameter file found for {model_type} or file already cleared.")
 
 def main():
-    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
     logger.info("Choose an option:")
     logger.info("1. Run LSTM Model")
     logger.info("2. Run Time Series Transformer Model")
