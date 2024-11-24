@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from statsmodels.tsa.arima.model import ARIMA
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from data.modify_dataset import prepare_data
+from data.preprocess_data import prepare_data
 
 # Ensure the logs, models, and params directories exist
 LOG_DIR = 'logs/'

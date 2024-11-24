@@ -1,26 +1,24 @@
 import warnings
-
-import joblib
-
-from lstm import remove_existing_model
 warnings.filterwarnings("ignore", "urllib3 v2 only supports OpenSSL")
 
 import os
-import glob
 import logging
 import sys
 import json
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-import matplotlib.pyplot as plt
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
+import joblib
 from datetime import datetime
-from data.modify_dataset import prepare_data
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import tensorflow as tf
+from tensorflow.keras.layers import Dense, Input, LayerNormalization, Dropout # type: ignore
+from tensorflow.keras.models import Model # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.optimizers.schedules import ExponentialDecay # type: ignore
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../data')))
+from preprocess_data import process_data
 
-# Ensure the logs, models, and params directories exist
 LOG_DIR = 'logs/'
 MODEL_DIR = 'models/'
 PARAMS_DIR = 'params/'
@@ -28,239 +26,192 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(PARAMS_DIR, exist_ok=True)
 
-# Generate a timestamped log file name
-log_filename = os.path.join(LOG_DIR, f"transformer_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+log_filename = os.path.join(LOG_DIR, f"ts_transformer_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[logging.StreamHandler(sys.stdout),
+                              logging.FileHandler(log_filename, mode='w')])
 
-# Configure logging with both console and file handlers
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
-if logger.hasHandlers():
-    logger.handlers.clear()
+def create_sequences(data, seq_length, target_indices):
+    """
+    Creates input-output sequences for time-series forecasting.
 
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-logger.addHandler(console_handler)
+    Args:
+        data (np.array): Array of shape (time_steps, features).
+        seq_length (int): Length of each input sequence.
+        target_indices (list): Indices of target columns in the data.
 
-file_handler = logging.FileHandler(log_filename, mode='w')
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
-
-# Function to keep only the most recent 5 logs
-def cleanup_old_logs(directory, prefix="transformer_log_", max_logs=5):
-    log_files = sorted(glob.glob(os.path.join(directory, f"{prefix}*.log")), key=os.path.getmtime)
-    if len(log_files) > max_logs:
-        for log_file in log_files[:-max_logs]:
-            os.remove(log_file)
-            logger.info(f"Deleted old log file: {log_file}")
-
-def create_sequences(data, seq_length):
+    Returns:
+        np.array, np.array: Input sequences (X) and target outputs (y).
+    """
     X, y = [], []
     for i in range(len(data) - seq_length):
         X.append(data[i:i + seq_length])
-        y.append(data[i + seq_length])
+        y.append(data[i + seq_length, target_indices])
     return np.array(X), np.array(y)
 
-# Transformer model definition
-class TimeSeriesTransformer(nn.Module):
-    def __init__(self, input_size, num_layers, num_heads, d_model, dim_feedforward):
-        super(TimeSeriesTransformer, self).__init__()
-        self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=num_heads, dim_feedforward=dim_feedforward, batch_first=True
-        )
-        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
-        self.fc = nn.Linear(d_model, 1)
+def build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, dropout_rate):
+    """
+    Builds a Transformer model for time-series forecasting.
 
-    def forward(self, x):
-        x = self.transformer_encoder(x)
-        x = self.fc(x[:, -1, :])  # Get the output of the last time step
-        return x
+    Args:
+        seq_length (int): Length of input sequences.
+        num_features (int): Number of input features.
+        num_heads (int): Number of attention heads.
+        num_layers (int): Number of Transformer layers.
+        d_model (int): Embedding dimension.
+        ff_dim (int): Feedforward dimension.
+        target_size (int): Number of output targets.
+        dropout_rate (float): Dropout rate.
 
-def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_layers, num_heads, d_model, dim_feedforward, learning_rate, scaler):
-    if d_model % num_heads != 0:
-        logger.warning(f"Skipping invalid combination: d_model={d_model}, num_heads={num_heads} (d_model must be divisible by num_heads)")
-        return None, None, None, None
+    Returns:
+        tf.keras.Model: Compiled Transformer model.
+    """
+    inputs = Input(shape=(seq_length, num_features))
+    x = Dense(d_model)(inputs)
+    x = LayerNormalization()(x)
 
-    model = TimeSeriesTransformer(
-        input_size=d_model,
-        num_layers=num_layers,
-        num_heads=num_heads,
-        d_model=d_model,
-        dim_feedforward=dim_feedforward
-    )
+    for _ in range(num_layers):
+        attention_output = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model)(x, x)
+        x = LayerNormalization()(x + attention_output)
+        feed_forward_output = Dense(ff_dim, activation='relu')(x)
+        x = LayerNormalization()(x + feed_forward_output)
 
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    x = Dropout(dropout_rate)(x)
+    x = tf.reduce_mean(x, axis=1)  # Global average pooling
+    outputs = Dense(target_size)(x)
 
-    X_train = torch.FloatTensor(X_train).reshape(-1, X_train.shape[1], 1)
-    X_test = torch.FloatTensor(X_test).reshape(-1, X_test.shape[1], 1)
-    y_train = torch.FloatTensor(y_train).reshape(-1, 1)
-    y_test = torch.FloatTensor(y_test).reshape(-1, 1)
+    model = Model(inputs, outputs)
+    return model
 
-    projection = nn.Linear(1, d_model)
-    X_train = projection(X_train)
-    X_test = projection(X_test)
+def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_heads, num_layers, d_model, ff_dim, learning_rate, dropout_rate, seq_length, target_size):
+    """
+    Trains and evaluates the Transformer model.
 
-    model.train()
-    epochs = 50
-    for epoch in range(epochs):
-        optimizer.zero_grad()
-        output = model(X_train)
-        loss = criterion(output.squeeze(), y_train.squeeze())
-        loss.backward(retain_graph=True)
-        optimizer.step()
+    Args:
+        Various model hyperparameters.
 
-    model.eval()
-    with torch.no_grad():
-        predictions = model(X_test).squeeze().numpy()
-        predictions = scaler.inverse_transform(predictions.reshape(-1, 1))
-        y_test_actual = scaler.inverse_transform(y_test.numpy().reshape(-1, 1))
+    Returns:
+        float: RMSE of the model.
+    """
+    num_features = X_train.shape[2]
+    model = build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, dropout_rate)
+    lr_schedule = ExponentialDecay(initial_learning_rate=learning_rate, decay_steps=1000, decay_rate=0.9)
+    model.compile(optimizer=Adam(learning_rate=lr_schedule), loss='mse')
 
-    mae = mean_absolute_error(y_test_actual, predictions)
-    rmse = np.sqrt(mean_squared_error(y_test_actual, predictions))
+    history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=0)
 
-    return model, mae, rmse, loss.item()
-
-def plot_metrics(metrics_history, param_name):
-    param_values = [entry[param_name] for entry in metrics_history]
-    mae_values = [entry['mae'] for entry in metrics_history]
-    rmse_values = [entry['rmse'] for entry in metrics_history]
-    val_loss_values = [entry['val_loss'] for entry in metrics_history]
-
-    plt.figure(figsize=(14, 7))
-    plt.plot(param_values, mae_values, marker='o', label='MAE')
-    plt.plot(param_values, rmse_values, marker='o', label='RMSE')
-    plt.plot(param_values, val_loss_values, marker='o', label='Validation Loss')
-    plt.xlabel(param_name.capitalize())
-    plt.ylabel('Metric Value')
-    plt.title(f'Metrics vs {param_name.capitalize()}')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
+    predictions = model.predict(X_test)
+    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+    return model, rmse, history.history['val_loss'][-1]
 
 def save_best_params(best_params):
+    """
+    Dynamically saves the best parameters.
+
+    Args:
+        best_params (dict): The best parameters to save.
+    """
     params_path = os.path.join(PARAMS_DIR, 'best_ts_transformer_params.json')
-    best_params_converted = {key: int(value) if isinstance(value, (np.integer, np.int64)) else value
-                             for key, value in best_params.items()}
-    if os.path.exists(params_path):
-        with open(params_path, 'r') as f:
-            existing_params = json.load(f)
-        if isinstance(existing_params, dict):
-            existing_params = [existing_params]
-    else:
-        existing_params = []
-    existing_params.append(best_params_converted)
+
+    required_keys = ['num_heads', 'num_layers', 'd_model', 'ff_dim', 'learning_rate', 'dropout_rate']
+    for key in required_keys:
+        if key not in best_params:
+            logger.warning(f"Missing parameter '{key}' in best_params before saving. Adding default value.")
+            if key == 'learning_rate':
+                best_params[key] = 0.001
+            elif key == 'num_heads':
+                best_params[key] = 4
+            elif key == 'num_layers':
+                best_params[key] = 2
+            elif key == 'd_model':
+                best_params[key] = 64
+            elif key == 'ff_dim':
+                best_params[key] = 128
+            elif key == 'dropout_rate':
+                best_params[key] = 0.1
+
     with open(params_path, 'w') as f:
-        json.dump(existing_params, f, indent=4)
-    logger.info(f"Best parameters updated and saved to {params_path}")
+        json.dump(best_params, f, indent=4)
+    logger.info(f"Best parameters saved dynamically to {params_path}")
 
 def load_best_params():
+    """
+    Loads the best parameters from a JSON file. If some keys are missing,
+    default values are added.
+
+    Returns:
+        dict: Best parameters with all required keys.
+    """
     params_path = os.path.join(PARAMS_DIR, 'best_ts_transformer_params.json')
+
+    default_params = {'num_heads': 4, 'num_layers': 2, 'd_model': 64, 'ff_dim': 128, 'learning_rate': 0.001, 'dropout_rate': 0.1}
+
     if os.path.exists(params_path):
         with open(params_path, 'r') as f:
-            params_list = json.load(f)
-            if isinstance(params_list, list) and params_list:
-                return params_list[-1] 
-    return None
+            params = json.load(f)
 
-def clear_params():
-    params_path = os.path.join(PARAMS_DIR, 'best_ts_transformer_params.json')
-    if os.path.exists(params_path):
-        os.remove(params_path)
-        logger.info(f"Cleared parameter file: {params_path}")
-        
-def remove_existing_model(model_dir):
-    for file in os.listdir(model_dir):
-        file_path = os.path.join(model_dir, file)
-        if os.path.isfile(file_path) and file_path.endswith('.pt'):
-            os.remove(file_path)
-            logger.info(f"Deleted old model file: {file_path}")
+            for key, default_value in default_params.items():
+                if key not in params:
+                    logger.warning(f"Key '{key}' missing in loaded params. Adding default value: {default_value}")
+                    params[key] = default_value
 
-def view_model_parameters(model):
-    logger.info("Viewing Model Parameters:")
-    for name, param in model.named_parameters():
-        logger.info(f"Layer: {name} | Size: {list(param.size())}")
-        
-def save_scaler(scaler, path="models/scaler.pkl"):
-    joblib.dump(scaler, path)
-    logger.info(f"Scaler saved to {path}")
+            return params
 
-def load_scaler(path="models/scaler.pkl"):
-    if os.path.exists(path):
-        logger.info(f"Scaler loaded from {path}")
-        return joblib.load(path)
-    else:
-        logger.error(f"No scaler found at {path}. Ensure the scaler is saved during training.")
-        return None
-    
+    logger.warning(f"Parameters file '{params_path}' not found. Using default parameters.")
+    return default_params
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == '--view-params':
-        logger.info("Viewing parameters of the best Transformer model...")
-        model_path = os.path.join(MODEL_DIR, 'best_ts_transformer_model.pt')
+    logger.info("Loading and preprocessing data")
+    processed_file = 'data/processed_coffee_shop_data.csv'
+    df = process_data(processed_file, 'data/ts_transformer_output.csv')
 
-        if not os.path.exists(model_path):
-            logger.error(f"No saved model found at {model_path}")
-            return
-
-        best_params = load_best_params()
-        if not best_params:
-            logger.error("No saved parameters found.")
-            return
-
-        logger.info(f"Loading model with parameters: {best_params}")
-        model = TimeSeriesTransformer(
-            input_size=best_params['d_model'],
-            num_layers=best_params['num_layers'],
-            num_heads=best_params['num_heads'],
-            d_model=best_params['d_model'],
-            dim_feedforward=best_params['dim_feedforward']
-        )
-        model.load_state_dict(torch.load(model_path))
-        view_model_parameters(model)
-        return
-    
-    cleanup_old_logs(LOG_DIR)
-
-    logger.info("Starting Transformer model script")
-
-    # Load and prepare data
-    logger.info("Loading and preparing data")
-    data = prepare_data('data/cafecast_data.xlsx')
-    daily_data = data.resample('D')['transaction_qty'].sum()
-    logger.info(f"Data overview: {daily_data.describe()}")
-
-    # Scale the data
+    features = ['transaction_qty', 'revenue']
     scaler = MinMaxScaler()
-    scaled_data = scaler.fit_transform(daily_data.values.reshape(-1, 1))
+    scaled_data = scaler.fit_transform(df[features])
 
-    # Save the scaler
-    save_scaler(scaler, os.path.join(MODEL_DIR, 'scaler.pkl'))
+    scaler_path = os.path.join(MODEL_DIR, 'scaler_ts_transformer.pkl')
+    joblib.dump(scaler, scaler_path)
+    logger.info(f"Scaler saved to {scaler_path}")
 
-    SEQ_LENGTH = 10  # Base sequence length
-    X, y = create_sequences(scaled_data, SEQ_LENGTH)
+    seq_length = 10
+    target_indices = [0, 1]
+    X, y = create_sequences(scaled_data, seq_length, target_indices)
+
     train_size = int(len(X) * 0.8)
     X_train, X_test = X[:train_size], X[train_size:]
     y_train, y_test = y[:train_size], y[train_size:]
 
-    logger.info(f"Training data size: {len(X_train)}, Testing data size: {len(X_test)}")
+    best_params = load_best_params()
+    logger.info(f"Starting with best parameters: {best_params}")
 
-    # Load existing best parameters if available
-    best_params = load_best_params() or {'num_layers': 2, 'num_heads': 2, 'd_model': 64, 'dim_feedforward': 128}
-    logger.info(f"Starting with initial best parameters: {best_params}")
+    best_rmse = float('inf')
+    no_improvement_count = 0
 
-    # Train and save the best model
-    final_model, mae, rmse, val_loss = train_and_evaluate_model(
-        X_train, X_test, y_train, y_test,
-        **best_params, learning_rate=0.001, scaler=scaler
-    )
+    for iteration in range(10):  # Max 10 iterations
+        logger.info(f"Iteration {iteration + 1}: Testing parameters {best_params}")
+        model, rmse, val_loss = train_and_evaluate_model(
+            X_train, X_test, y_train, y_test,
+            best_params['num_heads'], best_params['num_layers'], best_params['d_model'],
+            best_params['ff_dim'], best_params['learning_rate'], best_params['dropout_rate'],
+            seq_length, len(target_indices)
+        )
+        logger.info(f"Results: RMSE={rmse:.2f}, Validation Loss={val_loss:.4f}")
 
-    # Save the model
-    model_path = os.path.join(MODEL_DIR, 'best_ts_transformer_model.pt')
-    torch.save(final_model.state_dict(), model_path)
-    logger.info(f"Best model saved to {model_path}")
+        if rmse < best_rmse:
+            logger.info(f"New best RMSE found: {rmse:.2f}")
+            best_rmse = rmse
+            model.save(os.path.join(MODEL_DIR, 'best_ts_transformer_model.keras'))
+            save_best_params(best_params)
+            no_improvement_count = 0
+        else:
+            logger.info("No improvement in RMSE.")
+            no_improvement_count += 1
+
+        if no_improvement_count >= 3:
+            logger.info("No improvement for 3 iterations. Stopping early.")
+            break
 
 if __name__ == "__main__":
     main()
