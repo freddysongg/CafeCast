@@ -21,7 +21,7 @@ LSTM_BAYESIAN_MODEL_PATH = "models/best_lstm_bayesian_model.keras"
 TRANSFORMER_MODEL_PATH = "models/best_ts_transformer_model.pt"
 ARIMA_MODEL_PATH = "models/arima_model.pkl"
 PARAMS_DIR = "params/"
-SCALER_PATH = "scaler.pkl"
+SCALER_PATH = "models/scaler.pkl"
 
 # LSTM Model
 lstm_model = None

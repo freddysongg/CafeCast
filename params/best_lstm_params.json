@@ -1,5 +1,12 @@
-{
-    "batch_size": 61,
-    "epochs": 214,
-    "num_units": 289
-}
+[
+    {
+        "batch_size": 61,
+        "epochs": 214,
+        "num_units": 289
+    },
+    {
+        "num_units": 50,
+        "batch_size": 40,
+        "epochs": 100
+    }
+]
