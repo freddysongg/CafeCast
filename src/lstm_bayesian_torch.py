@@ -8,6 +8,7 @@ import json
 import numpy as np
 import pandas as pd
 import joblib
+from joblib import Parallel, delayed
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -24,6 +25,8 @@ PARAMS_DIR = 'params/'
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(PARAMS_DIR, exist_ok=True)
+
+cache = {}
 
 log_filename = os.path.join(LOG_DIR, f"lstm_bayesian_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
@@ -246,6 +249,48 @@ def objective_function(num_units, batch_size, epochs, learning_rate):
     logger.info(f"Tested params: num_units={num_units}, batch_size={batch_size}, epochs={epochs}, learning_rate={learning_rate}, RMSE={rmse:.2f}")
     return -rmse  
 
+def objective_function_with_cache(num_units, batch_size, epochs, learning_rate):
+    """
+    Objective function with caching to avoid redundant computations.
+
+    Args:
+        num_units (float): Number of LSTM units.
+        batch_size (float): Batch size for training.
+        epochs (float): Number of epochs for training.
+        learning_rate (float): Learning rate for the optimizer.
+
+    Returns:
+        float: Negative RMSE (for Bayesian Optimization).
+    """
+    key = (int(num_units), int(batch_size), int(epochs), learning_rate)
+    if key in cache:
+        logger.info(f"Using cached result for params: {key}")
+        return cache[key]
+    
+    rmse = objective_function(num_units, batch_size, epochs, learning_rate)
+    cache[key] = rmse
+    return rmse
+
+def parallel_evaluate(params_list):
+    """
+    Evaluates multiple parameter sets in parallel.
+
+    Args:
+        params_list (list): List of parameter dictionaries to evaluate.
+
+    Returns:
+        list: List of evaluation results corresponding to the parameter sets.
+    """
+    return Parallel(n_jobs=-1)(
+        delayed(objective_function_with_cache)(
+            params['num_units'],
+            params['batch_size'],
+            params['epochs'],
+            params['learning_rate']
+        )
+        for params in params_list
+    )
+
 def main():
     """
     Main function for running Bayesian Optimization on a PyTorch LSTM model.
@@ -266,6 +311,8 @@ def main():
         - Assumes global variables for processed data (`X_train`, `X_test`, `y_train`, etc.).
         - Saves the model to `models/best_lstm_model.pth`.
         - Saves the best hyperparameters to `params/best_lstm_bayesian_params.json`.
+        - Implements caching to reuse results for previously tested parameter sets.
+        - Parallelizes the evaluations using joblib for faster computation.
     """
     logger.info("Loading and preprocessing data")
     processed_file = 'data/processed_coffee_shop_data.csv'
@@ -307,12 +354,33 @@ def main():
     }
 
     optimizer = BayesianOptimization(
-        f=objective_function,
+        f=objective_function_with_cache,
         pbounds=bounds,
         verbose=2,
         random_state=42,
     )
-    optimizer.maximize(init_points=5, n_iter=20)
+
+    # Batch evaluations with caching and parallelization
+    init_points = 3
+    n_iter = 10
+
+    for _ in range(init_points):
+        optimizer.probe(
+            params={
+                'num_units': np.random.uniform(*bounds['num_units']),
+                'batch_size': np.random.uniform(*bounds['batch_size']),
+                'epochs': np.random.uniform(*bounds['epochs']),
+                'learning_rate': np.random.uniform(*bounds['learning_rate']),
+            },
+            lazy=True,
+        )
+    
+    for _ in range(n_iter):
+        param_batch = optimizer.suggest(n_suggestions=5)
+        logger.info(f"Evaluating batch of {len(param_batch)} parameter sets.")
+        results = parallel_evaluate(param_batch)
+        for params, result in zip(param_batch, results):
+            optimizer.register(params=params, target=result)
 
     best_params = optimizer.max['params']
     logger.info(f"Best parameters found: {best_params}")

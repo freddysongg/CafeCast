@@ -8,6 +8,8 @@ import json
 import numpy as np
 import pandas as pd
 import joblib
+from joblib import Parallel, delayed
+from collections import defaultdict
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -24,6 +26,8 @@ PARAMS_DIR = 'params/'
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(PARAMS_DIR, exist_ok=True)
+
+evaluation_cache = defaultdict(lambda: None)
 
 log_filename = os.path.join(LOG_DIR, f"lstm_bayesian_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
@@ -170,7 +174,7 @@ def load_best_params():
 def objective_function(num_units, batch_size, epochs, learning_rate):
     """
     Objective function for Bayesian Optimization. Trains the LSTM model and evaluates its performance 
-    using the provided hyperparameters.
+    using the provided hyperparameters. Uses caching to avoid redundant evaluations.
 
     Args:
         num_units (float): Number of LSTM units (treated as a float by Bayesian Optimization).
@@ -182,6 +186,12 @@ def objective_function(num_units, batch_size, epochs, learning_rate):
         float: Negative RMSE (Root Mean Squared Error). The negative value is used because Bayesian 
                Optimization maximizes the objective function, and we aim to minimize RMSE.
     """
+    params_key = (int(num_units), int(batch_size), int(epochs), round(learning_rate, 6))
+    
+    if params_key in evaluation_cache:
+        logger.info(f"Using cached result for parameters: {params_key}")
+        return evaluation_cache[params_key]
+
     model, rmse = train_and_evaluate_model(
         product_train, X_train, product_test, X_test, y_train, y_test,
         num_units=num_units, batch_size=batch_size, epochs=epochs,
@@ -189,7 +199,30 @@ def objective_function(num_units, batch_size, epochs, learning_rate):
         num_products=num_products, embedding_dim=embedding_dim
     )
     logger.info(f"Tested params: num_units={num_units}, batch_size={batch_size}, epochs={epochs}, learning_rate={learning_rate}, RMSE={rmse:.2f}")
-    return -rmse  # Negative because Bayesian Optimization maximizes
+    
+    # Cache the result
+    evaluation_cache[params_key] = -rmse  # Negative because Bayesian Optimization maximizes
+    return -rmse
+
+def parallel_objective_function(params_list):
+    """
+    Wrapper to run multiple evaluations in parallel using `joblib`.
+
+    Args:
+        params_list (list): A list of parameter dictionaries to evaluate in parallel.
+
+    Returns:
+        list: A list of results for the objective function for each parameter set.
+    """
+    results = Parallel(n_jobs=-1)(
+        delayed(objective_function)(
+            num_units=p['num_units'],
+            batch_size=p['batch_size'],
+            epochs=p['epochs'],
+            learning_rate=p['learning_rate']
+        ) for p in params_list
+    )
+    return results
 
 def main():
     """
@@ -208,7 +241,7 @@ def main():
         6. Saves the trained model to disk.
 
     Notes:
-        - Assumes global variables for processed data (`X_train`, `X_test`, `y_train`, etc.).
+        - Uses parallel evaluations for Bayesian Optimization.
         - Saves the model to `models/best_lstm_model.h5`.
         - Saves the best hyperparameters to `params/best_lstm_bayesian_params.json`.
     """
@@ -255,11 +288,31 @@ def main():
         verbose=2,
         random_state=42,
     )
-    optimizer.maximize(init_points=5, n_iter=20)
+
+    init_points = 3
+    n_iter = 10
+
+    # Evaluate initial points in parallel
+    initial_params = [
+        {k: np.random.uniform(bounds[k][0], bounds[k][1]) for k in bounds.keys()}
+        for _ in range(init_points)
+    ]
+    initial_results = parallel_objective_function(initial_params)
+
+    for params, result in zip(initial_params, initial_results):
+        optimizer.register(params, result)
+
+    # Run Bayesian Optimization iterations in parallel
+    for _ in range(n_iter):
+        next_points = [optimizer.suggest(optimizer.space) for _ in range(-1)]
+        next_results = parallel_objective_function(next_points)
+        for params, result in zip(next_points, next_results):
+            optimizer.register(params, result)
 
     best_params = optimizer.max['params']
     logger.info(f"Best parameters found: {best_params}")
     save_best_params(best_params)
+
 
 if __name__ == "__main__":
     main()
