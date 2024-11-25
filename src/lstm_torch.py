@@ -11,9 +11,9 @@ import joblib
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from tensorflow.keras.models import Sequential # type: ignore
-from tensorflow.keras.layers import LSTM, Dense, Input, Embedding, Concatenate # type: ignore
-from tensorflow.keras.optimizers import Adam # type: ignore
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../data')))
 from preprocess_data import process_data
@@ -54,62 +54,96 @@ def create_sequences(data, product_ids, seq_length, target_indices):
         products.append(product_ids[i:i + seq_length])
     return np.array(products), np.array(X), np.array(y)
 
-def train_and_evaluate_model(product_train, X_train, product_test, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, seq_length, target_size, num_products, embedding_dim):
+class LSTMModel(nn.Module):
     """
-    Trains and evaluates a TensorFlow LSTM model with product embeddings.
+    Defines a PyTorch-based LSTM model for time-series forecasting.
 
     Args:
-        product_train (np.ndarray): Training product IDs (sequences of product IDs).
-        X_train (np.ndarray): Training numerical input features.
-        product_test (np.ndarray): Testing product IDs (sequences of product IDs).
-        X_test (np.ndarray): Testing numerical input features.
-        y_train (np.ndarray): Training target outputs.
-        y_test (np.ndarray): Testing target outputs.
+        input_size (int): Number of numerical input features per time step.
+        num_units (int): Number of hidden units in the LSTM layer.
+        target_size (int): Number of output targets (e.g., dimensions of the predictions).
+
+    Methods:
+        forward(x):
+            Processes input data through the LSTM layer and the fully connected layer.
+            Args:
+                x (torch.Tensor): Input tensor of shape (batch_size, seq_length, input_size).
+            Returns:
+                torch.Tensor: Predictions of shape (batch_size, target_size).
+    """
+    def __init__(self, input_size, num_units, target_size):
+        super(LSTMModel, self).__init__()
+        self.lstm = nn.LSTM(input_size, num_units, batch_first=True)
+        self.fc = nn.Linear(num_units, target_size)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = self.fc(out[:, -1, :]) 
+        return out
+
+def train_and_evaluate_model(X_train, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, seq_length, target_size, device):
+    """
+    Trains and evaluates the LSTM model using PyTorch.
+
+    Args:
+        X_train (np.array): Training input data of shape (num_samples, seq_length, num_features).
+        X_test (np.array): Testing input data of shape (num_samples, seq_length, num_features).
+        y_train (np.array): Training target data of shape (num_samples, target_size).
+        y_test (np.array): Testing target data of shape (num_samples, target_size).
         num_units (int): Number of hidden units in the LSTM layer.
         batch_size (int): Batch size for training.
         epochs (int): Number of training epochs.
         learning_rate (float): Learning rate for the optimizer.
-        seq_length (int): Sequence length of the input data.
-        target_size (int): Number of output targets (e.g., predictions per time step).
-        num_products (int): Number of unique product IDs for embedding.
-        embedding_dim (int): Dimension of the product embedding.
+        seq_length (int): Sequence length for each input sample.
+        target_size (int): Number of output targets.
+        device (torch.device): The device to run the model on ('cuda' for GPU or 'cpu').
 
     Returns:
-        tf.keras.Model: The trained TensorFlow LSTM model.
-        float: Mean Absolute Error (MAE) on the test dataset.
-        float: Root Mean Squared Error (RMSE) on the test dataset.
+        LSTMModel: The trained PyTorch model.
+        float: Mean Absolute Error (MAE) on the test data.
+        float: Root Mean Squared Error (RMSE) on the test data.
     """
-    product_input = Input(shape=(seq_length,), name='product_id')
-    numerical_input = Input(shape=(seq_length, X_train.shape[2]), name='numerical_features')
+    input_size = X_train.shape[2]
+    model = LSTMModel(input_size, num_units, target_size).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    product_embedding = Embedding(input_dim=num_products, output_dim=embedding_dim)(product_input)
+    train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    combined_input = Concatenate()([numerical_input, product_embedding])
+    model.train()
+    for epoch in range(epochs):
+        for X_batch, y_batch in train_loader:
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
 
-    lstm_output = LSTM(units=int(num_units), activation='relu')(combined_input)
-    outputs = Dense(target_size)(lstm_output)
+            optimizer.zero_grad()
+            outputs = model(X_batch)
+            loss = criterion(outputs, y_batch)
+            loss.backward()
+            optimizer.step()
 
-    model = model(inputs=[product_input, numerical_input], outputs=outputs)
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
+    model.eval()
+    with torch.no_grad():
+        X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+        y_test_tensor = torch.tensor(y_test, dtype=torch.float32).to(device)
 
-    model.fit([product_train, X_train], y_train, epochs=int(epochs), batch_size=int(batch_size), validation_split=0.1, verbose=0)
-
-    predictions = model.predict([product_test, X_test])
-    mae = mean_absolute_error(y_test, predictions)
-    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+        predictions = model(X_test_tensor).cpu().numpy()
+        mae = mean_absolute_error(y_test, predictions)
+        rmse = np.sqrt(mean_squared_error(y_test, predictions))
+    
     return model, mae, rmse
 
 def save_best_params(best_params):
     """
-    Saves the best hyperparameters dynamically to a JSON file.
+    Saves the best hyperparameters dynamically to a JSON file. Appends to an existing file if present.
 
     Args:
-        best_params (dict): Dictionary containing the best hyperparameters. 
+        best_params (dict): A dictionary containing the best hyperparameters. 
                             Keys must include 'num_units', 'batch_size', 'epochs', and 'learning_rate'.
 
     Notes:
-        If any required keys are missing, default values are added before saving.
-        The parameters are saved as a JSON file (`params/best_lstm_params.json`).
+        If required keys are missing, default values are added before saving.
+        The parameters are appended to a list if a JSON file already exists.
     """
     params_path = os.path.join(PARAMS_DIR, 'best_lstm_params.json')
 
@@ -151,8 +185,8 @@ def load_best_params():
     Loads the most recent hyperparameters from a JSON file.
 
     Returns:
-        dict: A dictionary containing the loaded hyperparameters. If the file doesn't exist or keys are missing, 
-              default values are used.
+        dict: A dictionary containing the loaded hyperparameters. If the file doesn't exist
+              or keys are missing, default values are used.
 
     Notes:
         Default parameters include:
@@ -225,40 +259,28 @@ def dynamic_param_tuning(best_params, gradient):
 
 def main():
     """
-    Main function to preprocess data, build, train, and evaluate the LSTM model.
+    Main function to run the LSTM training and evaluation pipeline.
 
     Steps:
         1. Loads and preprocesses the dataset.
-        2. Maps product IDs to integers for embedding.
-        3. Splits the data into training and testing sets.
-        4. Initializes hyperparameters for the LSTM model:
-           - num_units: Number of LSTM hidden units.
-           - batch_size: Batch size for training.
-           - epochs: Number of epochs for training.
-           - learning_rate: Learning rate for the optimizer.
-           - seq_length: Sequence length for inputs.
-           - target_size: Number of prediction targets.
-           - num_products: Number of unique products for embedding.
-           - embedding_dim: Dimension of the product embedding.
-        5. Builds, trains, and evaluates the LSTM model.
-        6. Saves the trained model to disk.
+        2. Splits the data into training and testing sets.
+        3. Loads the best hyperparameters (if available) or initializes defaults.
+        4. Iteratively trains the LSTM model with the current parameters.
+        5. Dynamically tunes hyperparameters based on performance gradients.
+        6. Saves the best hyperparameters and the trained model.
 
     Notes:
-        - Assumes preprocessed data from `process_data`.
-        - Saves the model to `models/best_lstm_model.keras`.
+        - The process stops early if no improvement is observed for 3 consecutive iterations.
+        - The model is saved to `models/best_lstm_model.pth`.
+        - The best hyperparameters are saved to `params/best_lstm_params.json`.
     """
     logger.info("Loading and preprocessing data")
     processed_file = 'data/processed_coffee_shop_data.csv'
     df = process_data(processed_file, 'data/lstm_output.csv')
 
-    unique_products = df['product_id'].unique()
-    product_mapping = {product: idx for idx, product in enumerate(unique_products)}
-    df['product_id'] = df['product_id'].map(product_mapping)
-
     features = ['transaction_qty', 'revenue']
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(df[features])
-    product_ids = df['product_id'].values
 
     scaler_path = os.path.join(MODEL_DIR, 'scaler_lstm.pkl')
     joblib.dump(scaler, scaler_path)
@@ -266,32 +288,43 @@ def main():
 
     seq_length = 10
     target_indices = [0, 1]
-    product_sequences, X, y = create_sequences(scaled_data, product_ids, seq_length, target_indices)
+    X, y = create_sequences(scaled_data, seq_length, target_indices)
 
     train_size = int(len(X) * 0.8)
     X_train, X_test = X[:train_size], X[train_size:]
     y_train, y_test = y[:train_size], y[train_size:]
-    product_train, product_test = product_sequences[:train_size], product_sequences[train_size:]
 
-    num_units = 128
-    embedding_dim = 16
-    num_products = len(product_mapping)
-    target_size = len(target_indices)
-    learning_rate = 0.001
-    batch_size = 32
-    epochs = 50
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    logger.info("Building and training LSTM model")
-    model, mae, rmse = train_and_evaluate_model(
-        product_train, X_train, product_test, X_test, y_train, y_test,
-        num_units, batch_size, epochs, learning_rate, seq_length, target_size, num_products, embedding_dim
-    )
+    best_params = load_best_params() or {'num_units': 128, 'batch_size': 32, 'epochs': 50, 'learning_rate': 0.001}
+    logger.info(f"Starting with best parameters: {best_params}")
 
-    logger.info(f"Evaluation - MAE: {mae:.2f}, RMSE: {rmse:.2f}")
+    best_rmse = float('inf')
+    no_improvement_count = 0
 
-    model_path = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
-    model.save(model_path)
-    logger.info(f"Model saved to {model_path}")
+    for iteration in range(10):  # Max 10 iterations
+        logger.info(f"Iteration {iteration + 1}: Testing parameters {best_params}")
+        model, mae, rmse = train_and_evaluate_model(
+            X_train, X_test, y_train, y_test,
+            best_params['num_units'], best_params['batch_size'], best_params['epochs'],
+            best_params['learning_rate'], seq_length, len(target_indices), device
+        )
+        logger.info(f"Results: MAE={mae:.2f}, RMSE={rmse:.2f}")
+
+        if rmse < best_rmse:
+            logger.info(f"New best RMSE found: {rmse:.2f}")
+            best_rmse = rmse
+            torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'best_lstm_model.pth'))
+            save_best_params(best_params)
+            logger.info(f"Updated best parameters: {best_params}")
+            no_improvement_count = 0
+        else:
+            logger.info("No improvement in RMSE.")
+            no_improvement_count += 1
+
+        if no_improvement_count >= 3:
+            logger.info("No improvement for 3 iterations. Stopping early.")
+            break
 
 if __name__ == "__main__":
     main()

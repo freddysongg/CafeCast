@@ -102,7 +102,7 @@ def process_data(file_path, output_path):
     Returns:
         pd.DataFrame: Processed DataFrame.
     """
-    data = pd.read_excel(file_path, engine='openpyxl')
+    data = pd.read_csv(file_path)
 
     data['transaction_date'] = pd.to_datetime(data['transaction_date'])
 

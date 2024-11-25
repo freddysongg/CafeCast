@@ -11,9 +11,9 @@ import joblib
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from tensorflow.keras.models import Sequential  # type: ignore
-from tensorflow.keras.layers import LSTM, Dense, Input, Embedding, Concatenate  # type: ignore
-from tensorflow.keras.optimizers import Adam  # type: ignore
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from bayes_opt import BayesianOptimization
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../data')))
 from preprocess_data import process_data
@@ -54,9 +54,45 @@ def create_sequences(data, product_ids, seq_length, target_indices):
         products.append(product_ids[i:i + seq_length])
     return np.array(products), np.array(X), np.array(y)
 
-def train_and_evaluate_model(product_train, X_train, product_test, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, seq_length, target_size, num_products, embedding_dim):
+class LSTMModel(nn.Module):
     """
-    Trains and evaluates a TensorFlow LSTM model with product embeddings.
+    Defines a PyTorch-based LSTM model with product embeddings and a fully connected output layer.
+
+    Args:
+        input_size (int): Number of numerical input features per time step.
+        num_units (int): Number of hidden units in the LSTM layer.
+        output_size (int): Number of output targets (e.g., predictions per time step).
+        num_products (int): Number of unique product IDs for embedding.
+        embedding_dim (int): Dimension of the product embedding.
+
+    Methods:
+        forward(numerical_input, product_input):
+            Combines numerical features with product embeddings, processes them through LSTM layers, 
+            and returns predictions.
+
+            Args:
+                numerical_input (torch.Tensor): Numerical features of shape (batch_size, seq_length, input_size).
+                product_input (torch.Tensor): Product ID features of shape (batch_size, seq_length).
+            
+            Returns:
+                torch.Tensor: Predictions of shape (batch_size, output_size).
+    """
+    def __init__(self, input_size, num_units, output_size, num_products, embedding_dim):
+        super(LSTMModel, self).__init__()
+        self.embedding = nn.Embedding(num_products, embedding_dim)
+        self.lstm = nn.LSTM(input_size + embedding_dim, num_units, batch_first=True)
+        self.fc = nn.Linear(num_units, output_size)
+
+    def forward(self, numerical_input, product_input):
+        embedded_products = self.embedding(product_input)
+        combined_input = torch.cat((numerical_input, embedded_products), dim=2)
+        lstm_out, _ = self.lstm(combined_input)
+        output = self.fc(lstm_out[:, -1, :])  # Use the last LSTM output
+        return output
+
+def train_and_evaluate_model(product_train, X_train, product_test, X_test, y_train, y_test, num_units, batch_size, epochs, learning_rate, seq_length, target_size, num_products, embedding_dim, device):
+    """
+    Trains and evaluates a PyTorch LSTM model with product embeddings.
 
     Args:
         product_train (np.ndarray): Training product IDs (sequences of product IDs).
@@ -70,31 +106,48 @@ def train_and_evaluate_model(product_train, X_train, product_test, X_test, y_tra
         epochs (int): Number of training epochs.
         learning_rate (float): Learning rate for the optimizer.
         seq_length (int): Sequence length of the input data.
-        target_size (int): Number of output targets (e.g., predictions per time step).
+        target_size (int): Number of target outputs (e.g., predictions per time step).
         num_products (int): Number of unique product IDs for embedding.
         embedding_dim (int): Dimension of the product embedding.
+        device (torch.device): Device to run the model on ('cuda' for GPU, 'cpu' otherwise).
 
     Returns:
-        tf.keras.Model: The trained TensorFlow LSTM model.
+        LSTMModel: The trained PyTorch LSTM model.
         float: Root Mean Squared Error (RMSE) on the test dataset.
     """
-    product_input = Input(shape=(seq_length,), name='product_id')
-    numerical_input = Input(shape=(seq_length, X_train.shape[2]), name='numerical_features')
+    input_size = X_train.shape[2]
+    model = LSTMModel(input_size, int(num_units), target_size, num_products, embedding_dim).to(device)
 
-    product_embedding = Embedding(input_dim=num_products, output_dim=embedding_dim)(product_input)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    combined_input = Concatenate()([numerical_input, product_embedding])
+    train_dataset = torch.utils.data.TensorDataset(
+        torch.tensor(X_train, dtype=torch.float32),
+        torch.tensor(product_train, dtype=torch.long),
+        torch.tensor(y_train, dtype=torch.float32)
+    )
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=int(batch_size), shuffle=True)
 
-    lstm_output = LSTM(units=int(num_units), activation='relu')(combined_input)
-    outputs = Dense(target_size)(lstm_output)
+    model.train()
+    for epoch in range(int(epochs)):
+        for numerical_input, product_input, target in train_loader:
+            numerical_input, product_input, target = numerical_input.to(device), product_input.to(device), target.to(device)
 
-    model = model(inputs=[product_input, numerical_input], outputs=outputs)
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
+            optimizer.zero_grad()
+            output = model(numerical_input, product_input)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
 
-    model.fit([product_train, X_train], y_train, epochs=int(epochs), batch_size=int(batch_size), validation_split=0.1, verbose=0)
+    model.eval()
+    with torch.no_grad():
+        X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+        product_test_tensor = torch.tensor(product_test, dtype=torch.long).to(device)
+        y_test_tensor = torch.tensor(y_test, dtype=torch.float32).to(device)
 
-    predictions = model.predict([product_test, X_test])
-    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+        predictions = model(X_test_tensor, product_test_tensor).cpu().numpy()
+        rmse = np.sqrt(mean_squared_error(y_test, predictions))
+
     return model, rmse
 
 def save_best_params(best_params):
@@ -182,18 +235,20 @@ def objective_function(num_units, batch_size, epochs, learning_rate):
         float: Negative RMSE (Root Mean Squared Error). The negative value is used because Bayesian 
                Optimization maximizes the objective function, and we aim to minimize RMSE.
     """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     model, rmse = train_and_evaluate_model(
         product_train, X_train, product_test, X_test, y_train, y_test,
         num_units=num_units, batch_size=batch_size, epochs=epochs,
         learning_rate=learning_rate, seq_length=seq_length, target_size=len(target_indices),
-        num_products=num_products, embedding_dim=embedding_dim
+        num_products=num_products, embedding_dim=embedding_dim, device=device
     )
     logger.info(f"Tested params: num_units={num_units}, batch_size={batch_size}, epochs={epochs}, learning_rate={learning_rate}, RMSE={rmse:.2f}")
-    return -rmse  # Negative because Bayesian Optimization maximizes
+    return -rmse  
 
 def main():
     """
-    Main function for running Bayesian Optimization on a TensorFlow LSTM model.
+    Main function for running Bayesian Optimization on a PyTorch LSTM model.
 
     Steps:
         1. Loads and preprocesses the dataset.
@@ -209,7 +264,7 @@ def main():
 
     Notes:
         - Assumes global variables for processed data (`X_train`, `X_test`, `y_train`, etc.).
-        - Saves the model to `models/best_lstm_model.h5`.
+        - Saves the model to `models/best_lstm_model.pth`.
         - Saves the best hyperparameters to `params/best_lstm_bayesian_params.json`.
     """
     logger.info("Loading and preprocessing data")
@@ -228,6 +283,8 @@ def main():
     scaler_path = os.path.join(MODEL_DIR, 'scaler_lstm_bayesian.pkl')
     joblib.dump(scaler, scaler_path)
     logger.info(f"Scaler saved to {scaler_path}")
+
+    logger.info("Running LSTM Bayesian Optimization using PyTorch")
 
     global seq_length, target_indices, X_train, X_test, y_train, y_test, product_train, product_test, num_products, embedding_dim
     seq_length = 10

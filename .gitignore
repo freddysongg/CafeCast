@@ -2,6 +2,8 @@ venv/
 __pycache__/
 .ipynb_checkpoints/
 
-models/
-
 logs/
+
+data/__pycache__/
+src/__pycache__/
+

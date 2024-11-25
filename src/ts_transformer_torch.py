@@ -12,10 +12,10 @@ from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import tensorflow as tf
-from tensorflow.keras.layers import Embedding, Concatenate, LayerNormalization, GlobalAveragePooling1D, Dropout, Dense, Input # type: ignore
-from tensorflow.keras.models import Model # type: ignore
-from tensorflow.keras.optimizers import Adam # type: ignore
-from tensorflow.keras.optimizers.schedules import ExponentialDecay # type: ignore
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../data')))
 from preprocess_data import process_data
 
@@ -47,6 +47,10 @@ def create_sequences(data, product_ids, seq_length, target_indices):
         np.array: Product ID sequences of shape (num_sequences, seq_length).
         np.array: Numerical input sequences of shape (num_sequences, seq_length, features).
         np.array: Target outputs of shape (num_sequences, len(target_indices)).
+
+    Example:
+        If `data` contains transaction quantities and revenues, and `product_ids` contains product mappings,
+        this function generates sequences with a fixed length (`seq_length`) for model input.
     """
     X, y, products = [], [], []
     for i in range(len(data) - seq_length):
@@ -55,52 +59,97 @@ def create_sequences(data, product_ids, seq_length, target_indices):
         products.append(product_ids[i:i + seq_length])
     return np.array(products), np.array(X), np.array(y)
 
-def build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, num_products, dropout_rate):
+def create_gradient(rmse_change, overfit_threshold=0.01, underfit_threshold=0.05):
     """
-    Builds a Transformer-based model for time-series forecasting with product embeddings.
+    Creates a gradient to adjust hyperparameters dynamically based on model performance.
 
     Args:
-        seq_length (int): Length of input sequences.
-        num_features (int): Number of numerical input features.
-        num_heads (int): Number of attention heads in the Transformer layers.
-        num_layers (int): Number of Transformer layers.
-        d_model (int): Dimension of embeddings for both product IDs and numerical inputs.
-        ff_dim (int): Dimension of the feed-forward layers.
-        target_size (int): Number of output targets (e.g., predictions per time step).
-        num_products (int): Number of unique product IDs for embedding.
-        dropout_rate (float): Dropout rate for regularization.
+        rmse_change (float): The change in RMSE between iterations (negative for improvement).
+        overfit_threshold (float): Threshold for identifying potential overfitting.
+        underfit_threshold (float): Threshold for identifying potential underfitting.
 
     Returns:
-        tf.keras.Model: A compiled Transformer-based time-series forecasting model.
+        dict: Gradient indicating 'increase' or 'decrease' for each hyperparameter.
     """
-    product_input = Input(shape=(seq_length,), name='product_id')
-    product_embedding = Embedding(input_dim=num_products, output_dim=d_model)(product_input)
+    gradient = {}
 
-    numerical_input = Input(shape=(seq_length, num_features), name='numerical_features')
-    numerical_projection = Dense(d_model)(numerical_input) 
+    if rmse_change > underfit_threshold:
+        # Model underfits; increase capacity
+        gradient = {
+            'num_heads': 'increase',
+            'num_layers': 'increase',
+            'd_model': 'increase',
+            'ff_dim': 'increase',
+            'learning_rate': 'increase',
+            'dropout_rate': 'decrease',  # Reduce regularization to avoid underfitting
+        }
+    elif rmse_change < -overfit_threshold:
+        # Model overfits; decrease capacity or increase regularization
+        gradient = {
+            'num_heads': 'decrease',
+            'num_layers': 'decrease',
+            'd_model': 'decrease',
+            'ff_dim': 'decrease',
+            'learning_rate': 'decrease',
+            'dropout_rate': 'increase',  # Add regularization to mitigate overfitting
+        }
+    else:
+        gradient = {
+            'num_heads': 'increase',
+            'num_layers': 'decrease',
+            'd_model': 'increase',
+            'ff_dim': 'decrease',
+            'learning_rate': 'decrease',
+            'dropout_rate': 'decrease',
+        }
 
-    combined = Concatenate()([numerical_projection, product_embedding])
-    combined = Dense(d_model)(combined)  
-    x = LayerNormalization()(combined)
+    return gradient
 
-    for _ in range(num_layers):
-        attention_output = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model)(x, x)
-        x = LayerNormalization()(x + attention_output)
-
-        feed_forward_output = Dense(ff_dim, activation='relu')(x)
-        feed_forward_output = Dense(d_model)(feed_forward_output)  
-        x = LayerNormalization()(x + feed_forward_output)
-
-    x = GlobalAveragePooling1D()(x)
-    x = Dropout(dropout_rate)(x)
-    outputs = Dense(target_size)(x)
-
-    model = Model(inputs=[product_input, numerical_input], outputs=outputs)
-    return model
-
-def train_and_evaluate_model(inputs_train, inputs_test, y_train, y_test, num_heads, num_layers, d_model, ff_dim, learning_rate, dropout_rate, seq_length, target_size):
+class TransformerModel(nn.Module):
     """
-    Trains and evaluates the Transformer model for time-series forecasting.
+    Transformer-based model for time-series forecasting with product embeddings.
+
+    Attributes:
+        embedding (nn.Embedding): Embedding layer for product IDs.
+        projection (nn.Linear): Linear layer to project numerical inputs to the same dimension as embeddings.
+        transformer_layers (nn.TransformerEncoder): Stacked Transformer encoder layers for processing sequences.
+        global_pool (nn.AdaptiveAvgPool1d): Adaptive average pooling layer to reduce sequence dimension.
+        dropout (nn.Dropout): Dropout layer for regularization.
+        output_layer (nn.Linear): Linear output layer to predict target values.
+
+    Methods:
+        forward(numerical_input, product_input):
+            Combines numerical features and product embeddings, passes them through the Transformer layers, and 
+            outputs predictions.
+    """
+    def __init__(self, seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, num_products, dropout_rate):
+        super(TransformerModel, self).__init__()
+        self.embedding = nn.Embedding(num_products, d_model)
+        self.projection = nn.Linear(num_features, d_model)  
+        self.transformer_layers = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads, dim_feedforward=ff_dim, dropout=dropout_rate, batch_first=True),
+            num_layers=num_layers
+        )
+        self.global_pool = nn.AdaptiveAvgPool1d(1)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.output_layer = nn.Linear(d_model, target_size)
+
+    def forward(self, numerical_input, product_input):
+        product_embedded = self.embedding(product_input) 
+        numerical_projected = self.projection(numerical_input) 
+
+        x = numerical_projected + product_embedded  
+
+        x = self.transformer_layers(x) 
+
+        x = x.permute(0, 2, 1) 
+        x = self.global_pool(x).squeeze(-1) 
+        x = self.dropout(x)
+        return self.output_layer(x) 
+
+def train_and_evaluate_model(inputs_train, inputs_test, y_train, y_test, num_heads, num_layers, d_model, ff_dim, learning_rate, dropout_rate, seq_length, target_size, num_products, device):
+    """
+    Trains and evaluates the Transformer model using PyTorch.
 
     Args:
         inputs_train (list): Training inputs, including product IDs and numerical features ([product_train, X_train]).
@@ -115,28 +164,52 @@ def train_and_evaluate_model(inputs_train, inputs_test, y_train, y_test, num_hea
         dropout_rate (float): Dropout rate for regularization.
         seq_length (int): Length of input sequences.
         target_size (int): Number of output targets.
+        num_products (int): Number of unique product IDs for embedding.
+        device (torch.device): Device to run the model on ('cuda' for GPU, 'cpu' otherwise).
 
     Returns:
-        tf.keras.Model: The trained Transformer model.
+        TransformerModel: The trained Transformer model.
         float: Root Mean Squared Error (RMSE) on the test dataset.
-        float: Final validation loss from the training history.
+
+    Notes:
+        - The function uses PyTorch's `DataLoader` for efficient batching during training.
+        - Regularization is applied using dropout layers in the model.
     """
     product_train, X_train = inputs_train
     product_test, X_test = inputs_test
 
-    num_features = X_train.shape[2]
-    num_products = product_train.max() + 1  
+    model = TransformerModel(seq_length, X_train.shape[2], num_heads, num_layers, d_model, ff_dim, target_size, num_products, dropout_rate).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    model = build_transformer_model(seq_length, num_features, num_heads, num_layers, d_model, ff_dim, target_size, num_products, dropout_rate)
+    train_dataset = TensorDataset(
+        torch.tensor(X_train, dtype=torch.float32),
+        torch.tensor(product_train, dtype=torch.long),
+        torch.tensor(y_train, dtype=torch.float32)
+    )
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
+    model.train()
+    for epoch in range(50):  # 50 epochs
+        for numerical_input, product_input, targets in train_loader:
+            numerical_input, product_input, targets = numerical_input.to(device), product_input.to(device), targets.to(device)
 
-    history = model.fit([product_train, X_train], y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=0)
+            optimizer.zero_grad()
+            outputs = model(numerical_input, product_input)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
 
-    predictions = model.predict([product_test, X_test])
-    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+    model.eval()
+    with torch.no_grad():
+        X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+        product_test_tensor = torch.tensor(product_test, dtype=torch.long).to(device)
+        y_test_tensor = torch.tensor(y_test, dtype=torch.float32).to(device)
 
-    return model, rmse, history.history['val_loss'][-1]
+        predictions = model(X_test_tensor, product_test_tensor).cpu().numpy()
+        rmse = np.sqrt(mean_squared_error(y_test, predictions))
+
+    return model, rmse
 
 def dynamic_param_tuning(best_params, gradient):
     """
@@ -148,13 +221,16 @@ def dynamic_param_tuning(best_params, gradient):
 
     Returns:
         dict: Updated hyperparameters.
+
+    Example:
+        If `gradient` is {'num_heads': 'increase'}, the function increases the number of attention heads.
     """
     updated_params = best_params.copy()
     for param, direction in gradient.items():
         if direction == 'increase':
-            updated_params[param] *= 1.2 
+            updated_params[param] *= 1.2  
         elif direction == 'decrease':
-            updated_params[param] *= 0.8
+            updated_params[param] *= 0.8 
 
         if param == 'learning_rate':
             updated_params[param] = max(0.0001, min(0.01, updated_params[param]))
@@ -186,27 +262,16 @@ def save_best_params(best_params):
                             - 'dropout_rate'.
 
     Notes:
-        If any required keys are missing, default values are added before saving.
-        The parameters are saved to `params/best_ts_transformer_params.json`.
+        - If any required keys are missing, default values are added before saving.
+        - The parameters are saved to `params/best_ts_transformer_params.json`.
     """
     params_path = os.path.join(PARAMS_DIR, 'best_ts_transformer_params.json')
 
     required_keys = ['num_heads', 'num_layers', 'd_model', 'ff_dim', 'learning_rate', 'dropout_rate']
     for key in required_keys:
         if key not in best_params:
-            logger.warning(f"Missing parameter '{key}' in best_params before saving. Adding default value.")
-            if key == 'learning_rate':
-                best_params[key] = 0.001
-            elif key == 'num_heads':
-                best_params[key] = 4
-            elif key == 'num_layers':
-                best_params[key] = 2
-            elif key == 'd_model':
-                best_params[key] = 64
-            elif key == 'ff_dim':
-                best_params[key] = 128
-            elif key == 'dropout_rate':
-                best_params[key] = 0.1
+            logger.warning(f"Missing parameter '{key}' in best_params. Adding default value.")
+            best_params.setdefault(key, 0.001 if key == 'learning_rate' else 0.1)
 
     with open(params_path, 'w') as f:
         json.dump(best_params, f, indent=4)
@@ -236,19 +301,7 @@ def load_best_params():
     if os.path.exists(params_path):
         with open(params_path, 'r') as f:
             params = json.load(f)
-
-            if isinstance(params, list):
-                if len(params) == 0:
-                    logger.warning(f"Parameters file '{params_path}' is empty. Using default parameters.")
-                    return default_params
-                params = params[-1]  
-
-            for key, default_value in default_params.items():
-                if key not in params:
-                    logger.warning(f"Key '{key}' missing in loaded params. Adding default value: {default_value}")
-                    params[key] = default_value
-
-            return params
+            return {**default_params, **params}
 
     logger.warning(f"Parameters file '{params_path}' not found. Using default parameters.")
     return default_params
@@ -262,7 +315,7 @@ def main():
         2. Maps product IDs to integers for embedding.
         3. Splits the data into training and testing sets.
         4. Loads the best hyperparameters (if available) or initializes default values.
-        5. Iteratively trains and evaluates the Transformer model with the current parameters.
+        5. Iteratively trains and evaluates the Transformer model with the current parameters using gradient-based tuning.
         6. Saves the trained model and the best parameters to disk.
 
     Notes:
@@ -300,8 +353,9 @@ def main():
 
     best_rmse = float('inf')
     no_improvement_count = 0
+    max_iterations = 10
 
-    for iteration in range(10):  # Max 10 iterations
+    for iteration in range(max_iterations):
         logger.info(f"Iteration {iteration + 1}: Testing parameters {best_params}")
         model, rmse, val_loss = train_and_evaluate_model(
             [product_train, X_train], [product_test, X_test],
@@ -309,14 +363,15 @@ def main():
             best_params['d_model'], best_params['ff_dim'], best_params['learning_rate'],
             best_params['dropout_rate'], seq_length, len(target_indices)
         )
-        logger.info(f"Results: RMSE={rmse:.2f}, Validation Loss={val_loss:.4f}")
+
+        logger.info(f"Iteration {iteration + 1} Results - RMSE: {rmse:.2f}, Validation Loss: {val_loss:.4f}")
 
         if rmse < best_rmse:
             logger.info(f"New best RMSE found: {rmse:.2f}")
             best_rmse = rmse
             model.save(os.path.join(MODEL_DIR, 'best_ts_transformer_model.keras'))
             save_best_params(best_params)
-            no_improvement_count = 0
+            no_improvement_count = 0  
         else:
             logger.info("No improvement in RMSE.")
             no_improvement_count += 1
@@ -325,8 +380,16 @@ def main():
             logger.info("No improvement for 3 iterations. Stopping early.")
             break
 
-        gradient = {'learning_rate': 'increase', 'd_model': 'decrease'}  
+        gradient = {
+            'learning_rate': 'decrease' if val_loss > 0.05 else 'increase',
+            'num_heads': 'increase' if rmse > 0.1 else 'decrease',
+            'num_layers': 'increase' if rmse > 0.1 else 'decrease',
+            'ff_dim': 'increase' if val_loss > 0.05 else 'decrease',
+            'dropout_rate': 'increase' if val_loss < 0.05 else 'decrease',
+        }
+
         best_params = dynamic_param_tuning(best_params, gradient)
+        logger.info(f"Updated parameters for next iteration: {best_params}")
 
     logger.info(f"Final RMSE after tuning: {best_rmse:.2f}")
 
