@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import joblib
 from joblib import Parallel, delayed
+from functools import partial
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -140,6 +141,9 @@ def train_and_evaluate_model(product_train, X_train, product_test, X_test, y_tra
             output = model(numerical_input, product_input)
             loss = criterion(output, target)
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
             optimizer.step()
 
     model.eval()
@@ -223,7 +227,7 @@ def load_best_params():
     logger.warning(f"Parameters file '{params_path}' not found. Using default parameters.")
     return default_params
 
-def objective_function(num_units, batch_size, epochs, learning_rate):
+def objective_function(num_units, batch_size, epochs, learning_rate, seq_length, target_indices, product_train, X_train, product_test, X_test, y_train, y_test, num_products, embedding_dim):
     """
     Objective function for Bayesian Optimization. Trains the LSTM model and evaluates its performance 
     using the provided hyperparameters.
@@ -247,9 +251,9 @@ def objective_function(num_units, batch_size, epochs, learning_rate):
         num_products=num_products, embedding_dim=embedding_dim, device=device
     )
     logger.info(f"Tested params: num_units={num_units}, batch_size={batch_size}, epochs={epochs}, learning_rate={learning_rate}, RMSE={rmse:.2f}")
-    return -rmse  
+    return -rmse
 
-def objective_function_with_cache(num_units, batch_size, epochs, learning_rate):
+def objective_function_with_cache(num_units, batch_size, epochs, learning_rate, seq_length, target_indices, product_train, X_train, product_test, X_test, y_train, y_test, num_products, embedding_dim):
     """
     Objective function with caching to avoid redundant computations.
 
@@ -262,16 +266,24 @@ def objective_function_with_cache(num_units, batch_size, epochs, learning_rate):
     Returns:
         float: Negative RMSE (for Bayesian Optimization).
     """
-    key = (int(num_units), int(batch_size), int(epochs), learning_rate)
+    key = (
+        int(num_units), int(batch_size), int(epochs), 
+        float(learning_rate), int(seq_length), 
+        tuple(target_indices), num_products, embedding_dim
+    )
+
     if key in cache:
         logger.info(f"Using cached result for params: {key}")
         return cache[key]
-    
-    rmse = objective_function(num_units, batch_size, epochs, learning_rate)
+
+    rmse = objective_function(
+        num_units, batch_size, epochs, learning_rate, seq_length, target_indices,
+        product_train, X_train, product_test, X_test, y_train, y_test, num_products, embedding_dim
+    )
     cache[key] = rmse
     return rmse
 
-def parallel_evaluate(params_list):
+def parallel_evaluate(params_list, seq_length, target_indices, product_train, X_train, product_test, X_test, y_train, y_test, num_products, embedding_dim):
     """
     Evaluates multiple parameter sets in parallel.
 
@@ -281,15 +293,51 @@ def parallel_evaluate(params_list):
     Returns:
         list: List of evaluation results corresponding to the parameter sets.
     """
-    return Parallel(n_jobs=-1)(
+    return Parallel(n_jobs=2)(
         delayed(objective_function_with_cache)(
             params['num_units'],
             params['batch_size'],
             params['epochs'],
-            params['learning_rate']
+            params['learning_rate'],
+            seq_length,
+            target_indices,
+            product_train,
+            X_train,
+            product_test,
+            X_test,
+            y_train,
+            y_test,
+            num_products,
+            embedding_dim
         )
         for params in params_list
     )
+
+def generate_unique_params(bounds, n_params, seen_params):
+    """
+    Generates a unique set of parameter suggestions for Bayesian Optimization.
+    
+    Args:
+        bounds (dict): Parameter bounds for the optimization.
+        n_params (int): Number of unique parameter sets to generate.
+        seen_params (set): A set of previously seen parameter sets.
+        
+    Returns:
+        list: A list of unique parameter dictionaries.
+    """
+    unique_params = []
+    while len(unique_params) < n_params:
+        new_params = {
+            'num_units': np.random.uniform(*bounds['num_units']),
+            'batch_size': np.random.uniform(*bounds['batch_size']),
+            'epochs': np.random.uniform(*bounds['epochs']),
+            'learning_rate': np.random.uniform(*bounds['learning_rate']),
+        }
+        params_tuple = tuple(new_params.items())
+        if params_tuple not in seen_params:
+            unique_params.append(new_params)
+            seen_params.add(params_tuple)
+    return unique_params
 
 def main():
     """
@@ -344,42 +392,63 @@ def main():
     product_train, product_test = product_sequences[:train_size], product_sequences[train_size:]
 
     num_products = len(product_mapping)
-    embedding_dim = 16
+    embedding_dim = 8
 
     bounds = {
-        'num_units': (64, 256),
-        'batch_size': (16, 64),
-        'epochs': (25, 100),
+        'num_units': (64, 128),
+        'batch_size': (16, 32),
+        'epochs': (10, 50),
         'learning_rate': (0.0001, 0.01),
     }
 
+    bound_objective = partial(
+        objective_function_with_cache,
+        seq_length=seq_length,
+        target_indices=target_indices,
+        product_train=product_train,
+        X_train=X_train,
+        product_test=product_test,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test,
+        num_products=num_products,
+        embedding_dim=embedding_dim
+    )
+
     optimizer = BayesianOptimization(
-        f=objective_function_with_cache,
+        f=bound_objective,
         pbounds=bounds,
         verbose=2,
         random_state=42,
     )
 
-    # Batch evaluations with caching and parallelization
-    init_points = 3
-    n_iter = 10
+    init_points = 5
+    optimizer.maximize(init_points=init_points, n_iter=0)
+    torch.cuda.empty_cache()
+    seen_params = set()
 
-    for _ in range(init_points):
-        optimizer.probe(
-            params={
-                'num_units': np.random.uniform(*bounds['num_units']),
-                'batch_size': np.random.uniform(*bounds['batch_size']),
-                'epochs': np.random.uniform(*bounds['epochs']),
-                'learning_rate': np.random.uniform(*bounds['learning_rate']),
-            },
-            lazy=True,
-        )
-    
+    # Run Bayesian Optimization iterations with batch parallelization
+    n_iter = 10
     for _ in range(n_iter):
-        param_batch = optimizer.suggest(n_suggestions=5)
-        logger.info(f"Evaluating batch of {len(param_batch)} parameter sets.")
-        results = parallel_evaluate(param_batch)
-        for params, result in zip(param_batch, results):
+        logger.info("Generating batch of suggestions.")
+        suggested_params = generate_unique_params(bounds, 5, seen_params)
+        logger.info(f"Evaluating {len(suggested_params)} parameter sets in parallel.")
+        
+        # Evaluate in parallel
+        results = parallel_evaluate(
+            suggested_params,
+            seq_length,
+            target_indices,
+            product_train,
+            X_train,
+            product_test,
+            X_test,
+            y_train,
+            y_test,
+            num_products,
+            embedding_dim
+        )
+        for params, result in zip(suggested_params, results):
             optimizer.register(params=params, target=result)
 
     best_params = optimizer.max['params']

@@ -104,7 +104,7 @@ This project is a testament to continuous learning and experimentation in the fi
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/cafecast.git
+   git clone https://github.com/freddysongg/cafecast.git
    cd cafecast
 2. Create a virtual environment:
     ```bash
