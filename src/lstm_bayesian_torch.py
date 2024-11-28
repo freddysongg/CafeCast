@@ -425,31 +425,32 @@ def main():
     init_points = 5
     optimizer.maximize(init_points=init_points, n_iter=0)
     torch.cuda.empty_cache()
-    seen_params = set()
+    # seen_params = set()
 
     # Run Bayesian Optimization iterations with batch parallelization
-    n_iter = 10
-    for _ in range(n_iter):
-        logger.info("Generating batch of suggestions.")
-        suggested_params = generate_unique_params(bounds, 5, seen_params)
-        logger.info(f"Evaluating {len(suggested_params)} parameter sets in parallel.")
+    n_iter = 5
+    # for _ in range(n_iter):
+    #     logger.info("Generating batch of suggestions.")
+    #     suggested_params = generate_unique_params(bounds, 5, seen_params)
+    #     logger.info(f"Evaluating {len(suggested_params)} parameter sets in parallel.")
         
-        # Evaluate in parallel
-        results = parallel_evaluate(
-            suggested_params,
-            seq_length,
-            target_indices,
-            product_train,
-            X_train,
-            product_test,
-            X_test,
-            y_train,
-            y_test,
-            num_products,
-            embedding_dim
-        )
-        for params, result in zip(suggested_params, results):
-            optimizer.register(params=params, target=result)
+    #     # Evaluate in parallel
+    #     results = parallel_evaluate(
+    #         suggested_params,
+    #         seq_length,
+    #         target_indices,
+    #         product_train,
+    #         X_train,
+    #         product_test,
+    #         X_test,
+    #         y_train,
+    #         y_test,
+    #         num_products,
+    #         embedding_dim
+    #     )
+    #     for params, result in zip(suggested_params, results):
+    #         optimizer.register(params=params, target=result)
+    optimizer.maximize(init_points=init_points, n_iter=n_iter)
 
     best_params = optimizer.max['params']
     logger.info(f"Best parameters found: {best_params}")
