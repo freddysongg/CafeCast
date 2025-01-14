@@ -1,6 +1,6 @@
 # CaféCast ☕📊
 
-**CaféCast** is an AI-powered sales forecasting and product analysis application. This project focuses on testing and enhancing my knowledge of machine learning models, hyperparameter fine-tuning, and model interpretability. It serves as a learning platform to explore advanced techniques, refine my skills, and deepen my understanding of how to apply machine learning to complex real-world problems. The main goal is to practice and improve while exploring the capabilities of various machine learning models and methodologies.
+**CaféCast** is a data-focused platform designed to help users explore and analyze datasets using AI-driven insights. This project currently focuses on manual data cleaning, shaping, and model training workflows, with plans to evolve into a fully interactive and user-friendly platform.
 
 ---
 
@@ -10,17 +10,15 @@
   - Supports **TensorFlow (CPU)** for macOS users to ensure compatibility and efficient local execution.
   - Utilizes **PyTorch (CUDA)** for Windows users with GPU support for accelerated training and predictions.
   - Automatic detection of the operating system to ensure the correct model implementation is selected.
-- **Broad Forecasting Capabilities:**
-  - Handles **multiple concurrent predictions**, enabling comprehensive sales and demand insights.
-  - Adaptable to a wide range of café datasets and forecasting requirements.
-- **Sales Forecasting Models:**
+- **Data Cleaning and Shaping:**
+  - Manual workflows for preparing datasets for analysis.
+- **Model Training:**
   - Advanced LSTM-based models with Bayesian optimization and iterative tuning for precise forecasts.
   - Time Series Transformers for capturing complex temporal dependencies.
   - Classical ARIMA modeling for interpretable, short-term linear trend forecasts.
 - **Enhanced Model Flexibility:**
   - Configurable hyperparameters to suit the unique characteristics of each dataset.
   - Dynamic support for both platform-optimized and manually fine-tuned workflows.
-- **Explainable AI:** SHAP values and attention mechanisms provide transparency into model decisions.
 - **Data Visualization:** Visual insights into sales trends, seasonality, and demand patterns.
 
 ---
@@ -80,6 +78,40 @@ This project is a testament to continuous learning and experimentation in the fi
 3. **Improved Model Interpretability:**
    - SHAP values for LSTM and ARIMA models to explain predictions.
    - Attention weights in Transformer models to provide insights into feature importance.
+
+---
+
+## Future Expansions 🚀
+
+CafeCast is set to evolve into a more interactive and user-friendly platform with the following key features:
+
+### 1. **User-Focused Frontend Deployment**
+
+- A dedicated web-based interface for seamless interaction.
+- Users can upload datasets directly through the frontend, removing the need for manual backend processes.
+- A clean and intuitive design that prioritizes simplicity and accessibility.
+- Technologies considered include **React**, **Next.js**, or other modern web frameworks for dynamic and responsive user experiences.
+
+### 2. **AI-Driven Q&A Functionality**
+
+- Users will be able to ask questions about their uploaded data through the frontend.
+- The platform will leverage pre-trained models saved on the backend to provide accurate and meaningful answers.
+- Natural language processing (NLP) capabilities will interpret user queries and deliver real-time responses.
+- Support for follow-up queries to explore datasets more deeply.
+
+### 3. **Automated Data Cleaning and Preprocessing**
+
+- Automate the current manual data cleaning workflow.
+- The platform will:
+  - Validate datasets upon upload.
+  - Detect and resolve missing values, outliers, and inconsistencies automatically.
+  - Present a preview of cleaned data for user confirmation.
+
+### 4. **Model Training and Customization**
+
+- Allow users to train or fine-tune models directly through the platform using their uploaded datasets.
+- Include visualization tools for monitoring training progress, accuracy, and performance metrics.
+- Ensure that users can easily customize their models to suit specific use cases.
 
 ---
 
